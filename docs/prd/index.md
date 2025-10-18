@@ -29,4 +29,7 @@
 - [Epic 1: Backend API & Infrastructure](./epic-1-backend-api.md)
 - [Epic 2: Keyboard Extension & Real-Time Detection](./epic-2-keyboard-extension.md)
 - [Epic 3: Companion App & Screenshot Scanner](./epic-3-companion-app.md)
+- [Epic 4: Screenshot Detection & Cross-App Notifications](./epic-4-screenshot-notifications.md)
+- [Epic 5: Automatic Screenshot Scanning](./epic-5-automatic-screenshot-scanning.md)
+- [Epic 6: Keyboard UI & Visual Consistency Improvements](./epic-6-keyboard-ui-improvements.md)
 

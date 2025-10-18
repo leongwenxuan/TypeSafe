@@ -19,7 +19,7 @@ from app.config import settings
 from app.services.risk_aggregator import analyze_text_aggregated, aggregate_results
 from app.services.gemini_service import analyze_image
 from app.services.groq_service import analyze_text as analyze_text_groq
-from app.db.operations import insert_text_analysis, insert_scan_result, get_latest_result
+from app.db.operations import insert_text_analysis, insert_scan_result, get_latest_result, ensure_session_exists
 
 # Configure logging
 logging.basicConfig(
@@ -272,8 +272,16 @@ async def analyze_text(request: AnalyzeTextRequest, req: Request):
         # Extract timestamp before storing (DB doesn't need it)
         timestamp = risk_response.pop('ts', datetime.now(timezone.utc).isoformat())
         
-        # Store analysis result in database
+        # Ensure session exists before storing result
         try:
+            # Create session if it doesn't exist
+            session_data = ensure_session_exists(session_uuid)
+            logger.info(
+                f"Session ensured: session_id={session_uuid} "
+                f"request_id={request_id}"
+            )
+            
+            # Store analysis result in database
             db_result = insert_text_analysis(
                 session_id=session_uuid,
                 app_bundle=request.app_bundle,
@@ -322,6 +330,7 @@ async def analyze_text(request: AnalyzeTextRequest, req: Request):
 async def scan_image(
     session_id: str = Form(...),
     ocr_text: str = Form(...),
+    user_country: str = Form(None),
     image: UploadFile = File(None),
     req: Request = None
 ):
@@ -403,12 +412,14 @@ async def scan_image(
                 f"scan_image: session_id={session_id} "
                 f"ocr_text_length={len(ocr_text)} "
                 f"image_size={len(image_bytes)} image_format={image_format} "
+                f"user_country={user_country} "
                 f"request_id={request_id}"
             )
         else:
             logger.info(
                 f"scan_image: session_id={session_id} "
                 f"ocr_text_length={len(ocr_text)} image=None "
+                f"user_country={user_country} "
                 f"request_id={request_id}"
             )
         
@@ -420,7 +431,8 @@ async def scan_image(
             gemini_result = await analyze_image(
                 image_data=image_data,
                 ocr_text=ocr_text,
-                mime_type=mime_type
+                mime_type=mime_type,
+                user_country=user_country
             )
             logger.info(
                 f"Gemini analysis succeeded: risk_level={gemini_result.get('risk_level')} "
@@ -473,8 +485,16 @@ async def scan_image(
         # Generate timestamp for response
         timestamp = datetime.now(timezone.utc).isoformat()
         
-        # Store result in database
+        # Ensure session exists before storing result
         try:
+            # Create session if it doesn't exist
+            session_data = ensure_session_exists(session_uuid)
+            logger.info(
+                f"Session ensured: session_id={session_uuid} "
+                f"request_id={request_id}"
+            )
+            
+            # Store result in database
             db_result = insert_scan_result(
                 session_id=session_uuid,
                 ocr_text=ocr_text,

@@ -6,6 +6,7 @@
 //
 
 import UIKit
+import Photos
 
 // MARK: - Keyboard Layout Enum
 enum KeyboardLayout {
@@ -35,7 +36,7 @@ class KeyboardViewController: UIInputViewController {
     private let apiService = APIService()
     
     // Banner management (Story 2.4)
-    private var currentBanner: RiskAlertBannerView?
+    private var currentBanner: UIView?
     private var autoDismissTimer: Timer?
     private var feedbackGenerator: UIImpactFeedbackGenerator?
     
@@ -43,10 +44,23 @@ class KeyboardViewController: UIInputViewController {
     private var currentPopover: ExplainWhyPopoverView?
     
     // Shared state management (Story 2.7)
-    private let sharedStorageManager = SharedStorageManager()
+    private let sharedStorageManager = SharedStorageManager.shared
     
     // Privacy message management (Story 2.8)
     private var privacyMessageView: PrivacyMessageView?
+    
+    // Scan result polling (Story 3.7)
+    private var scanResultPollingTimer: Timer?
+    private var lastProcessedScanId: String?
+    
+    // Screenshot notification polling (Story 4.2)
+    private var screenshotNotificationService: ScreenshotNotificationService?
+    
+    // Direct screenshot detection in keyboard (Story 5.3 - Workaround)
+    private var screenshotDetectionService: ScreenshotDetectionService?
+    
+    // Direct API service for keyboard (Story 5.4 - Full Independence)
+    private let keyboardAPIService = KeyboardAPIService()
     
     // MARK: - Full Access Detection (Story 2.8)
     private var _cachedFullAccessStatus: Bool?
@@ -85,6 +99,12 @@ class KeyboardViewController: UIInputViewController {
             feedbackGenerator?.prepare()
         }
         
+        // Start scan result polling (Story 3.7)
+        startScanResultPolling()
+        
+        // Initialize and start screenshot notification polling (Story 4.2)
+        setupScreenshotNotificationPolling()
+        
         print("KeyboardViewController: setup completed")
     }
     
@@ -107,6 +127,15 @@ class KeyboardViewController: UIInputViewController {
         super.viewWillDisappear(animated)
         // Clean up banner and timer when keyboard is dismissed (Story 2.4)
         dismissBanner(animated: false)
+        
+        // Stop scan result polling (Story 3.7)
+        stopScanResultPolling()
+        
+        // Stop screenshot notification polling (Story 4.2)
+        screenshotNotificationService?.stopPolling()
+        
+        // Stop direct screenshot detection (Story 5.3)
+        screenshotDetectionService?.stopPolling()
     }
     
     override func didReceiveMemoryWarning() {
@@ -1073,7 +1102,7 @@ class KeyboardViewController: UIInputViewController {
         print("KeyboardViewController: Attempting to open keyboard settings")
         
         // Try to open Settings app with deep link to keyboard settings
-        if let settingsUrl = URL(string: "App-Prefs:General&path=Keyboard") {
+        if URL(string: "App-Prefs:General&path=Keyboard") != nil {
             // Note: This may not work in all iOS versions due to security restrictions
             // The keyboard extension has limited ability to open external URLs
             print("KeyboardViewController: Settings deep link not available from keyboard extension")
@@ -1099,5 +1128,513 @@ class KeyboardViewController: UIInputViewController {
         cachedShiftButton = nil
         cachedKeyboardAppearance = nil
         print("KeyboardViewController: Performance caches cleared")
+    }
+    
+    // MARK: - Scan Result Polling (Story 3.7)
+    
+    /// Starts polling for new scan results from companion app
+    private func startScanResultPolling() {
+        // Stop any existing timer
+        stopScanResultPolling()
+        
+        print("KeyboardViewController: Starting scan result polling")
+        
+        // Create timer with 5-second intervals for responsiveness vs battery efficiency
+        scanResultPollingTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            self?.checkForNewScanResults()
+        }
+        
+        // Also check immediately
+        checkForNewScanResults()
+    }
+    
+    /// Stops scan result polling
+    private func stopScanResultPolling() {
+        scanResultPollingTimer?.invalidate()
+        scanResultPollingTimer = nil
+        print("KeyboardViewController: Stopped scan result polling")
+    }
+    
+    /// Checks for new scan results from shared storage
+    private func checkForNewScanResults() {
+        // Use background queue to prevent UI blocking
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            
+            // Get latest scan result from shared storage
+            if let newResult = self.sharedStorageManager.getLatestSharedScanResult() {
+                // Check if we've already processed this scan
+                guard newResult.scanId != self.lastProcessedScanId else {
+                    return // Already processed this scan
+                }
+                
+                // Update last processed ID
+                self.lastProcessedScanId = newResult.scanId
+                
+                print("KeyboardViewController: New scan result detected")
+                print("  - Scan ID: \(newResult.scanId)")
+                print("  - Risk: \(newResult.riskLevel)")
+                print("  - Category: \(newResult.category)")
+                
+                // Show banner on main thread
+                DispatchQueue.main.async {
+                    self.showScanResultBanner(newResult)
+                }
+                
+                // Mark as read in background
+                DispatchQueue.global(qos: .utility).async {
+                    self.sharedStorageManager.markScanResultAsRead(newResult.scanId)
+                }
+            }
+            
+            // Cleanup old scan results periodically
+            self.sharedStorageManager.clearOldScanResults()
+        }
+    }
+    
+    /// Shows a banner for a new scan result
+    /// - Parameter scanResult: The SharedScanResult to display
+    private func showScanResultBanner(_ scanResult: SharedScanResult) {
+        // Dismiss any existing banner first
+        dismissBanner(animated: false)
+        
+        // Create scan result banner
+        let banner = ScanResultBannerView(
+            scanResult: scanResult,
+            dismissAction: { [weak self] in
+                self?.dismissBanner(animated: true)
+            }
+        )
+        
+        // Add banner to view hierarchy at top
+        view.addSubview(banner)
+        
+        // Setup Auto Layout constraints (banner positioned in top 60pt area)
+        NSLayoutConstraint.activate([
+            banner.topAnchor.constraint(equalTo: view.topAnchor),
+            banner.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            banner.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            banner.heightAnchor.constraint(equalToConstant: 60)
+        ])
+        
+        // Store reference (reusing currentBanner property)
+        currentBanner = banner
+        
+        // Animate appearance (fade in + slide down)
+        banner.alpha = 0
+        banner.transform = CGAffineTransform(translationX: 0, y: -60)
+        
+        UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseOut) {
+            banner.alpha = 1
+            banner.transform = .identity
+        }
+        
+        // Start auto-dismiss timer (10 seconds for scan result banners)
+        startScanResultAutoDismissTimer()
+        
+        print("KeyboardViewController: Scan result banner displayed")
+    }
+    
+    /// Starts the 10-second auto-dismiss timer for scan result banners
+    private func startScanResultAutoDismissTimer() {
+        // Invalidate existing timer
+        autoDismissTimer?.invalidate()
+        
+        // Create new timer (10 seconds for scan result banners)
+        autoDismissTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { [weak self] _ in
+            self?.dismissBanner(animated: true)
+        }
+    }
+    
+    // MARK: - Screenshot Notification Polling (Story 4.2)
+    
+    /// Sets up and starts screenshot notification polling service
+    private func setupScreenshotNotificationPolling() {
+        // Initialize App Group notification service (from main app)
+        screenshotNotificationService = ScreenshotNotificationService()
+        
+        // Set up callback for new notifications
+        screenshotNotificationService?.onNewNotification = { [weak self] notification in
+            self?.handleScreenshotNotification(notification)
+        }
+        
+        // Start polling
+        screenshotNotificationService?.startPolling()
+        
+        print("KeyboardViewController: Screenshot notification polling initialized")
+        
+        // Story 5.3 & 5.4: Direct screenshot detection with keyboard-based processing
+        // This works completely independently - NO main app needed!
+        screenshotDetectionService = ScreenshotDetectionService()
+        screenshotDetectionService?.startPolling { [weak self] in
+            print("🟢 KeyboardViewController: Screenshot detected - processing in keyboard!")
+            self?.handleScreenshotDetectedInKeyboard()
+        }
+        
+        print("KeyboardViewController: Direct screenshot detection initialized (INDEPENDENT MODE)")
+    }
+    
+    /// Handles a new screenshot notification by displaying the alert banner
+    /// - Parameter notification: The screenshot notification to handle
+    private func handleScreenshotNotification(_ notification: ScreenshotNotification) {
+        print("KeyboardViewController: Handling screenshot notification")
+        
+        // Dismiss any existing banner first (scan result or screenshot)
+        dismissBanner(animated: false)
+        
+        // Create screenshot alert banner
+        let banner = ScreenshotAlertBannerView(
+            notification: notification,
+            scanAction: { [weak self] in
+                self?.launchCompanionAppForScreenshotScan()
+            },
+            dismissAction: { [weak self] in
+                self?.dismissBanner(animated: true)
+            }
+        )
+        
+        // Configure accessibility
+        banner.configureAccessibility()
+        
+        // Add banner to view hierarchy at top
+        view.addSubview(banner)
+        
+        // Setup Auto Layout constraints (banner positioned in top 60pt area)
+        NSLayoutConstraint.activate([
+            banner.topAnchor.constraint(equalTo: view.topAnchor),
+            banner.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            banner.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            banner.heightAnchor.constraint(equalToConstant: 60)
+        ])
+        
+        // Store reference
+        currentBanner = banner
+        
+        // Animate appearance
+        banner.animateIn()
+        
+        // Start auto-dismiss timer (15 seconds for screenshot banners)
+        startScreenshotBannerAutoDismissTimer()
+        
+        print("KeyboardViewController: Screenshot alert banner displayed")
+    }
+    
+    /// Launches the companion app using URL scheme for screenshot scanning
+    /// Story 5.2: Enhanced with auto=true parameter for automatic screenshot fetching
+    private func launchCompanionAppForScreenshotScan() {
+        print("KeyboardViewController: Launching companion app for screenshot scan")
+        
+        // Story 5.2: Add auto=true parameter to trigger automatic screenshot fetching
+        guard let url = URL(string: "typesafe://scan?auto=true") else {
+            print("KeyboardViewController: Failed to create URL for deep link")
+            return
+        }
+        
+        // iOS keyboard extensions can open URLs via the responder chain
+        // Navigate up the responder chain to find UIApplication
+        var responder: UIResponder? = self
+        while responder != nil {
+            if let application = responder as? UIApplication {
+                application.open(url, options: [:], completionHandler: { success in
+                    print("KeyboardViewController: Deep link opened - success: \(success)")
+                })
+                break
+            }
+            responder = responder?.next
+        }
+        
+        // Dismiss the banner after launching
+        dismissBanner(animated: true)
+    }
+    
+    /// Story 5.4: Process screenshot directly in keyboard (FULLY INDEPENDENT!)
+    /// Fetches screenshot, performs OCR, calls API - all without main app!
+    private func handleScreenshotDetectedInKeyboard() {
+        print("🟡 KeyboardViewController: Processing screenshot DIRECTLY in keyboard")
+        
+        // Check Photos permission
+        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
+        guard status == .authorized || status == .limited else {
+            print("🔴 KeyboardViewController: Photos permission not granted")
+            return
+        }
+        
+        // Fetch most recent screenshot
+        let fetchOptions = PHFetchOptions()
+        fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        fetchOptions.predicate = NSPredicate(format: "mediaSubtype == %d", PHAssetMediaSubtype.photoScreenshot.rawValue)
+        fetchOptions.fetchLimit = 1
+        
+        let fetchResult = PHAsset.fetchAssets(with: .image, options: fetchOptions)
+        
+        guard let asset = fetchResult.firstObject else {
+            print("🔴 KeyboardViewController: No screenshot found")
+            return
+        }
+        
+        print("🟡 KeyboardViewController: Fetching screenshot image...")
+        
+        // Convert PHAsset to UIImage
+        let imageOptions = PHImageRequestOptions()
+        imageOptions.isSynchronous = false
+        imageOptions.deliveryMode = .highQualityFormat
+        let targetSize = CGSize(width: 1920, height: 1920)
+        
+        PHImageManager.default().requestImage(
+            for: asset,
+            targetSize: targetSize,
+            contentMode: .aspectFit,
+            options: imageOptions
+        ) { [weak self] image, info in
+            guard let self = self, let image = image else {
+                print("🔴 KeyboardViewController: Failed to load screenshot image")
+                return
+            }
+            
+            print("🟢 KeyboardViewController: Screenshot loaded - sending to API...")
+            
+            // Generate session ID
+            let sessionId = UUID().uuidString
+            
+            // Call API directly from keyboard!
+            self.keyboardAPIService.scanImage(image: image, sessionId: sessionId) { result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success(let response):
+                        print("🟢 KeyboardViewController: API SUCCESS!")
+                        print("   Risk: \(response.riskLevel)")
+                        print("   Confidence: \(response.confidence)")
+                        print("   Category: \(response.category)")
+                        
+                        // Show result banner directly!
+                        self.showScamResultBanner(response: response)
+                        
+                    case .failure(let error):
+                        print("🔴 KeyboardViewController: API FAILED - \(error.localizedDescription)")
+                        // Show error banner
+                        self.showErrorBanner(message: "Unable to analyze screenshot")
+                    }
+                }
+            }
+        }
+    }
+    
+    /// Shows a banner with the scam analysis result
+    private func showScamResultBanner(response: KeyboardAPIService.ScanResponse) {
+        print("🟢 KeyboardViewController: Showing result banner")
+        
+        // Dismiss any existing banner
+        dismissBanner(animated: false)
+        
+        // Determine risk color and icon
+        let backgroundColor: UIColor
+        let textColor: UIColor
+        let icon: String
+        
+        switch response.riskLevel.lowercased() {
+        case "high":
+            backgroundColor = UIColor.systemRed.withAlphaComponent(0.95)
+            textColor = .white
+            icon = "⚠️"
+        case "medium":
+            backgroundColor = UIColor.systemOrange.withAlphaComponent(0.95)
+            textColor = .white
+            icon = "⚠️"
+        case "low":
+            backgroundColor = UIColor.systemGreen.withAlphaComponent(0.95)
+            textColor = .white
+            icon = "✅"
+        default:
+            backgroundColor = UIColor.systemGray.withAlphaComponent(0.95)
+            textColor = .white
+            icon = "ℹ️"
+        }
+        
+        // Create banner view
+        let banner = UIView()
+        banner.backgroundColor = backgroundColor
+        banner.layer.cornerRadius = 8
+        banner.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Icon label
+        let iconLabel = UILabel()
+        iconLabel.text = icon
+        iconLabel.font = .systemFont(ofSize: 20)
+        iconLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Message label
+        let messageLabel = UILabel()
+        let confidencePercent = Int(response.confidence * 100)
+        messageLabel.text = "\(response.category.uppercased()): \(response.riskLevel.uppercased()) RISK (\(confidencePercent)%)"
+        messageLabel.textColor = textColor
+        messageLabel.font = .systemFont(ofSize: 14, weight: .semibold)
+        messageLabel.numberOfLines = 2
+        messageLabel.adjustsFontSizeToFitWidth = true
+        messageLabel.minimumScaleFactor = 0.8
+        messageLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Dismiss button
+        let dismissButton = UIButton(type: .system)
+        dismissButton.setTitle("✕", for: .normal)
+        dismissButton.setTitleColor(textColor, for: .normal)
+        dismissButton.titleLabel?.font = .systemFont(ofSize: 18, weight: .medium)
+        dismissButton.translatesAutoresizingMaskIntoConstraints = false
+        dismissButton.addTarget(self, action: #selector(dismissBannerTapped), for: .touchUpInside)
+        
+        // Add subviews
+        banner.addSubview(iconLabel)
+        banner.addSubview(messageLabel)
+        banner.addSubview(dismissButton)
+        
+        // Layout constraints
+        NSLayoutConstraint.activate([
+            // Icon
+            iconLabel.leadingAnchor.constraint(equalTo: banner.leadingAnchor, constant: 12),
+            iconLabel.centerYAnchor.constraint(equalTo: banner.centerYAnchor),
+            iconLabel.widthAnchor.constraint(equalToConstant: 24),
+            
+            // Message
+            messageLabel.leadingAnchor.constraint(equalTo: iconLabel.trailingAnchor, constant: 8),
+            messageLabel.centerYAnchor.constraint(equalTo: banner.centerYAnchor),
+            messageLabel.trailingAnchor.constraint(equalTo: dismissButton.leadingAnchor, constant: -8),
+            
+            // Dismiss button
+            dismissButton.trailingAnchor.constraint(equalTo: banner.trailingAnchor, constant: -12),
+            dismissButton.centerYAnchor.constraint(equalTo: banner.centerYAnchor),
+            dismissButton.widthAnchor.constraint(equalToConstant: 30),
+            dismissButton.heightAnchor.constraint(equalToConstant: 30),
+            
+            // Banner height
+            banner.heightAnchor.constraint(greaterThanOrEqualToConstant: 44)
+        ])
+        
+        currentBanner = banner
+        keyboardView.addSubview(banner)
+        
+        // Position banner ABOVE the keyboard (negative offset)
+        NSLayoutConstraint.activate([
+            banner.leadingAnchor.constraint(equalTo: keyboardView.leadingAnchor, constant: 8),
+            banner.trailingAnchor.constraint(equalTo: keyboardView.trailingAnchor, constant: -8),
+            banner.bottomAnchor.constraint(equalTo: keyboardView.topAnchor, constant: -8) // Above keyboard!
+        ])
+        
+        // Animate in
+        banner.alpha = 0
+        banner.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+        UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseOut) {
+            banner.alpha = 1.0
+            banner.transform = CGAffineTransform.identity
+        }
+        
+        // Auto-dismiss after 10 seconds
+        startBannerAutoDismissTimer(duration: 10.0)
+        
+        // Haptic feedback
+        let feedbackGenerator = UINotificationFeedbackGenerator()
+        feedbackGenerator.prepare()
+        
+        switch response.riskLevel.lowercased() {
+        case "high":
+            feedbackGenerator.notificationOccurred(.warning)
+        case "medium":
+            feedbackGenerator.notificationOccurred(.warning)
+        case "low":
+            feedbackGenerator.notificationOccurred(.success)
+        default:
+            break
+        }
+    }
+    
+    /// Dismiss banner button tapped
+    @objc private func dismissBannerTapped() {
+        dismissBanner(animated: true)
+    }
+    
+    /// Shows an error banner
+    private func showErrorBanner(message: String) {
+        print("🔴 KeyboardViewController: Showing error banner")
+        
+        dismissBanner(animated: false)
+        
+        // Create simple text banner for errors
+        let banner = UIView()
+        banner.backgroundColor = UIColor.systemGray.withAlphaComponent(0.95)
+        banner.layer.cornerRadius = 8
+        
+        let label = UILabel()
+        label.text = "❌ \(message)"
+        label.textColor = .white
+        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.numberOfLines = 2
+        label.textAlignment = .center
+        
+        banner.addSubview(label)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: banner.leadingAnchor, constant: 12),
+            label.trailingAnchor.constraint(equalTo: banner.trailingAnchor, constant: -12),
+            label.topAnchor.constraint(equalTo: banner.topAnchor, constant: 8),
+            label.bottomAnchor.constraint(equalTo: banner.bottomAnchor, constant: -8)
+        ])
+        
+        currentBanner = banner
+        keyboardView.addSubview(banner)
+        
+        banner.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            banner.leadingAnchor.constraint(equalTo: keyboardView.leadingAnchor, constant: 8),
+            banner.trailingAnchor.constraint(equalTo: keyboardView.trailingAnchor, constant: -8),
+            banner.bottomAnchor.constraint(equalTo: keyboardView.topAnchor, constant: -8) // Above keyboard!
+        ])
+        
+        UIView.animate(withDuration: 0.3) {
+            banner.alpha = 1.0
+        }
+        startBannerAutoDismissTimer(duration: 5.0)
+    }
+    
+    /// Starts auto-dismiss timer for banners
+    private func startBannerAutoDismissTimer(duration: TimeInterval) {
+        autoDismissTimer?.invalidate()
+        autoDismissTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { [weak self] _ in
+            self?.dismissBanner(animated: true)
+        }
+    }
+    
+    /// LEGACY: Launch app silently for automatic background scan (FALLBACK)
+    /// This is the old method - keeping as fallback if keyboard processing fails
+    private func launchCompanionAppForAutomaticScan() {
+        print("🟡 KeyboardViewController: Using FALLBACK - launching main app")
+        
+        guard let url = URL(string: "typesafe://scan?auto=true&silent=true") else {
+            print("🔴 KeyboardViewController: Failed to create URL for silent scan")
+            return
+        }
+        
+        var responder: UIResponder? = self
+        while responder != nil {
+            if let application = responder as? UIApplication {
+                application.open(url, options: [:], completionHandler: { success in
+                    if success {
+                        print("🟢 KeyboardViewController: Fallback triggered")
+                    } else {
+                        print("🔴 KeyboardViewController: Fallback failed")
+                    }
+                })
+                break
+            }
+            responder = responder?.next
+        }
+    }
+    
+    /// Starts the 15-second auto-dismiss timer for screenshot banners
+    private func startScreenshotBannerAutoDismissTimer() {
+        // Invalidate existing timer
+        autoDismissTimer?.invalidate()
+        
+        // Create new timer (15 seconds for screenshot banners)
+        autoDismissTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: false) { [weak self] _ in
+            self?.dismissBanner(animated: true)
+        }
     }
 }

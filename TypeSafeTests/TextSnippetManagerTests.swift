@@ -24,7 +24,7 @@ class TextSnippetManagerTests: XCTestCase {
     
     // MARK: - Sliding Window Tests
     
-    func test_append_whenBufferExceeds300Chars_maintainsWindowSize() {
+    func test_append_whenBufferExceeds3@00Chars_maintainsWindowSize() {
         // Given: 350 characters of text
         let longText = String(repeating: "a", count: 350)
         

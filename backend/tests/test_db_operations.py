@@ -15,6 +15,7 @@ from app.db import (
     insert_scan_result,
     get_latest_result,
 )
+from app.db.operations import get_session, ensure_session_exists
 from app.db.client import reset_client
 from app.db.operations import get_session_history
 
@@ -402,4 +403,63 @@ class TestRetentionPolicy:
         # 1. Run: SELECT cleanup_old_data();
         # 2. Verify cron job: SELECT * FROM cron.job;
         # 3. Test with old data insertion and manual cleanup
+
+
+class TestSessionManagement:
+    """Test session existence checking and auto-creation."""
+    
+    def test_get_session_existing(self):
+        """Test getting an existing session."""
+        # Create a session first
+        session_id = uuid.uuid4()
+        created_session = insert_session(session_id)
+        
+        # Get the session
+        retrieved_session = get_session(session_id)
+        
+        assert retrieved_session is not None
+        assert retrieved_session["session_id"] == str(session_id)
+        assert retrieved_session["session_id"] == created_session["session_id"]
+    
+    def test_get_session_nonexistent(self):
+        """Test getting a non-existent session returns None."""
+        nonexistent_id = uuid.uuid4()
+        result = get_session(nonexistent_id)
+        assert result is None
+    
+    def test_ensure_session_exists_creates_new(self):
+        """Test that ensure_session_exists creates a new session when it doesn't exist."""
+        new_session_id = uuid.uuid4()
+        
+        # Verify session doesn't exist
+        assert get_session(new_session_id) is None
+        
+        # Ensure session exists (should create it)
+        session_data = ensure_session_exists(new_session_id)
+        
+        # Verify session was created
+        assert session_data is not None
+        assert session_data["session_id"] == str(new_session_id)
+        
+        # Verify it can be retrieved
+        retrieved = get_session(new_session_id)
+        assert retrieved is not None
+        assert retrieved["session_id"] == str(new_session_id)
+    
+    def test_ensure_session_exists_returns_existing(self):
+        """Test that ensure_session_exists returns existing session without creating duplicate."""
+        # Create a session first
+        session_id = uuid.uuid4()
+        original_session = insert_session(session_id)
+        
+        # Ensure session exists (should return existing)
+        returned_session = ensure_session_exists(session_id)
+        
+        # Should be the same session
+        assert returned_session["session_id"] == original_session["session_id"]
+        assert returned_session["session_id"] == str(session_id)
+        
+        # Verify no duplicate was created by checking the database
+        retrieved = get_session(session_id)
+        assert retrieved["session_id"] == original_session["session_id"]
 

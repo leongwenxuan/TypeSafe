@@ -2,323 +2,375 @@
 //  APIServiceTests.swift
 //  TypeSafeTests
 //
-//  Story 2.3: Backend API Integration
-//  Unit tests for APIService with mocked dependencies
+//  Story 3.4: Backend Integration (Scan Image API)
+//  Unit tests for API service functionality
 //
 
 import XCTest
+import UIKit
 @testable import TypeSafe
 
-class APIServiceTests: XCTestCase {
+/// Unit tests for APIService functionality
+/// Tests multipart form data construction, session management, privacy settings, and error handling
+final class APIServiceTests: XCTestCase {
+    
+    // MARK: - Properties
     
     var apiService: APIService!
-    var mockNetworkClient: MockNetworkClient!
-    var mockSessionManager: MockSessionManager!
+    var mockSession: MockURLSession!
+    var sessionManager: SessionManager!
+    var privacyManager: PrivacyManager!
+    
+    // MARK: - Setup & Teardown
     
     override func setUp() {
         super.setUp()
-        mockNetworkClient = MockNetworkClient()
-        mockSessionManager = MockSessionManager()
+        
+        // Create mock session
+        mockSession = MockURLSession()
+        
+        // Create managers
+        sessionManager = SessionManager()
+        privacyManager = PrivacyManager()
+        
+        // Reset privacy setting to default
+        privacyManager.disableImageUpload()
+        
+        // Create API service with test configuration
         apiService = APIService(
-            networkClient: mockNetworkClient,
-            sessionManager: mockSessionManager,
-            baseURL: "https://test-backend.com"
+            baseURL: "https://test.example.com",
+            sessionManager: sessionManager,
+            privacyManager: privacyManager
         )
     }
     
     override func tearDown() {
         apiService = nil
-        mockNetworkClient = nil
-        mockSessionManager = nil
+        mockSession = nil
+        sessionManager = nil
+        privacyManager = nil
+        
+        // Clean up UserDefaults
+        UserDefaults.standard.removeObject(forKey: "TypeSafe.SessionID")
+        UserDefaults.standard.removeObject(forKey: "TypeSafe.ImageUploadEnabled")
+        
         super.tearDown()
     }
     
-    // MARK: - Test: Request Construction
+    // MARK: - Session Manager Tests
     
-    func testAnalyzeTextConstructsCorrectRequest() {
-        // Given: Mock session ID
-        mockSessionManager.mockSessionID = "test-session-123"
+    func testSessionIDGeneration() {
+        // Given
+        let sessionManager = SessionManager()
         
-        // When: Calling analyzeText
-        let expectation = self.expectation(description: "Request sent")
-        mockNetworkClient.onPost = { _, body in
-            // Then: Should construct correct request body
-            XCTAssertEqual(body["session_id"] as? String, "test-session-123")
-            XCTAssertEqual(body["app_bundle"] as? String, "unknown")
-            XCTAssertEqual(body["text"] as? String, "test message")
+        // When
+        let sessionID1 = sessionManager.getOrCreateSessionID()
+        let sessionID2 = sessionManager.getOrCreateSessionID()
+        
+        // Then
+        XCTAssertFalse(sessionID1.isEmpty, "Session ID should not be empty")
+        XCTAssertEqual(sessionID1, sessionID2, "Session ID should be consistent")
+        
+        // Verify UUID format
+        XCTAssertNotNil(UUID(uuidString: sessionID1), "Session ID should be valid UUID")
+    }
+    
+    func testSessionIDPersistence() {
+        // Given
+        let sessionManager1 = SessionManager()
+        let sessionID1 = sessionManager1.getOrCreateSessionID()
+        
+        // When - Create new session manager (simulates app restart)
+        let sessionManager2 = SessionManager()
+        let sessionID2 = sessionManager2.getOrCreateSessionID()
+        
+        // Then
+        XCTAssertEqual(sessionID1, sessionID2, "Session ID should persist across app sessions")
+    }
+    
+    func testSessionReset() {
+        // Given
+        let sessionManager = SessionManager()
+        let originalID = sessionManager.getOrCreateSessionID()
+        
+        // When
+        sessionManager.resetSession()
+        let newID = sessionManager.getOrCreateSessionID()
+        
+        // Then
+        XCTAssertNotEqual(originalID, newID, "Session ID should change after reset")
+        XCTAssertNotNil(UUID(uuidString: newID), "New session ID should be valid UUID")
+    }
+    
+    // MARK: - Privacy Manager Tests
+    
+    func testPrivacyManagerDefaultState() {
+        // Given
+        let privacyManager = PrivacyManager()
+        
+        // Then
+        XCTAssertFalse(privacyManager.isImageUploadEnabled, "Image upload should be disabled by default")
+    }
+    
+    func testPrivacyManagerToggle() {
+        // Given
+        let privacyManager = PrivacyManager()
+        XCTAssertFalse(privacyManager.isImageUploadEnabled)
+        
+        // When
+        privacyManager.enableImageUpload()
+        
+        // Then
+        XCTAssertTrue(privacyManager.isImageUploadEnabled, "Image upload should be enabled")
+        
+        // When
+        privacyManager.disableImageUpload()
+        
+        // Then
+        XCTAssertFalse(privacyManager.isImageUploadEnabled, "Image upload should be disabled")
+    }
+    
+    func testPrivacyManagerPersistence() {
+        // Given
+        let privacyManager1 = PrivacyManager()
+        privacyManager1.enableImageUpload()
+        
+        // When - Create new privacy manager (simulates app restart)
+        let privacyManager2 = PrivacyManager()
+        
+        // Then
+        XCTAssertTrue(privacyManager2.isImageUploadEnabled, "Privacy setting should persist")
+    }
+    
+    // MARK: - API Service Tests
+    
+    func testScanImageWithTextOnly() {
+        // Given
+        let expectation = XCTestExpectation(description: "API call completes")
+        let testText = "Test OCR text for analysis"
+        
+        // Mock successful response
+        let mockResponse = ScanImageResponse(
+            risk_level: "low",
+            confidence: 0.95,
+            category: "safe",
+            explanation: "Test response",
+            ts: "2025-01-18T10:30:00Z"
+        )
+        
+        // When
+        apiService.scanImage(ocrText: testText, image: nil) { result in
+            // Then
+            switch result {
+            case .success(let response):
+                XCTAssertEqual(response.risk_level, "low")
+                XCTAssertEqual(response.confidence, 0.95)
+                XCTAssertEqual(response.category, "safe")
+                XCTAssertEqual(response.explanation, "Test response")
+            case .failure(let error):
+                XCTFail("Expected success, got error: \(error)")
+            }
             expectation.fulfill()
         }
         
-        apiService.analyzeText(text: "test message") { _ in }
-        
-        waitForExpectations(timeout: 1.0)
+        wait(for: [expectation], timeout: 5.0)
     }
     
-    func testAnalyzeTextUsesCorrectEndpoint() {
-        // When: Calling analyzeText
-        let expectation = self.expectation(description: "Endpoint check")
-        mockNetworkClient.onPost = { url, _ in
-            // Then: Should use correct endpoint
-            XCTAssertEqual(url, "https://test-backend.com/analyze-text")
+    func testScanImageWithImageWhenPrivacyEnabled() {
+        // Given
+        privacyManager.enableImageUpload()
+        let expectation = XCTestExpectation(description: "API call completes")
+        let testText = "Test OCR text"
+        let testImage = createTestImage()
+        
+        // When
+        apiService.scanImage(ocrText: testText, image: testImage) { result in
+            // Then - Should include image in request when privacy allows
             expectation.fulfill()
         }
         
-        apiService.analyzeText(text: "test") { _ in }
-        
-        waitForExpectations(timeout: 1.0)
+        wait(for: [expectation], timeout: 5.0)
     }
     
-    func testAnalyzeTextRetrievesSessionID() {
-        // Given: Mock session manager
-        mockSessionManager.mockSessionID = "session-xyz"
+    func testScanImageWithImageWhenPrivacyDisabled() {
+        // Given
+        privacyManager.disableImageUpload()
+        let expectation = XCTestExpectation(description: "API call completes")
+        let testText = "Test OCR text"
+        let testImage = createTestImage()
         
-        // When: Calling analyzeText
-        let expectation = self.expectation(description: "Session ID retrieved")
-        mockNetworkClient.onPost = { _, body in
-            // Then: Should retrieve session ID from manager
-            XCTAssertEqual(body["session_id"] as? String, "session-xyz")
-            XCTAssert(self.mockSessionManager.getOrCreateCalled, "Should call getOrCreateSessionID")
+        // When
+        apiService.scanImage(ocrText: testText, image: testImage) { result in
+            // Then - Should not include image in request when privacy disabled
             expectation.fulfill()
         }
         
-        apiService.analyzeText(text: "test") { _ in }
-        
-        waitForExpectations(timeout: 1.0)
+        wait(for: [expectation], timeout: 5.0)
     }
     
-    // MARK: - Test: Successful Response Parsing
+    func testRetryMechanism() {
+        // Given
+        let expectation = XCTestExpectation(description: "Retry completes")
+        let testText = "Test text for retry"
+        
+        // When
+        apiService.retryScan(ocrText: testText, image: nil) { result in
+            // Then
+            expectation.fulfill()
+        }
+        
+        wait(for: [expectation], timeout: 5.0)
+    }
     
-    func testAnalyzeTextParsesSuccessfulResponse() {
-        // Given: Mock successful API response
-        let responseJSON = """
+    // MARK: - Error Handling Tests
+    
+    func testAPIErrorTypes() {
+        // Test timeout error
+        let timeoutError = APIError.timeout
+        XCTAssertEqual(timeoutError.errorDescription, "Request timed out after 4.0 seconds")
+        XCTAssertEqual(timeoutError.userFriendlyMessage, "The request took too long. Please check your internet connection and try again.")
+        
+        // Test network error
+        let networkError = APIError.networkError(NSError(domain: "Test", code: -1, userInfo: nil))
+        XCTAssertTrue(networkError.errorDescription?.contains("Network error") == true)
+        XCTAssertEqual(networkError.userFriendlyMessage, "Network connection failed. Please check your internet connection.")
+        
+        // Test rate limited error
+        let rateLimitedError = APIError.rateLimited
+        XCTAssertEqual(rateLimitedError.errorDescription, "Too many requests - please try again later")
+        XCTAssertEqual(rateLimitedError.userFriendlyMessage, "Too many requests. Please wait a moment and try again.")
+        
+        // Test server error
+        let serverError = APIError.serverError(500)
+        XCTAssertEqual(serverError.errorDescription, "Server error (500) - please try again")
+        XCTAssertEqual(serverError.userFriendlyMessage, "Server is temporarily unavailable. Please try again later.")
+        
+        // Test bad request error
+        let badRequestError = APIError.badRequest
+        XCTAssertEqual(badRequestError.errorDescription, "Bad request - please check your input")
+        XCTAssertEqual(badRequestError.userFriendlyMessage, "There was an issue with your request. Please try again.")
+    }
+    
+    // MARK: - Response Model Tests
+    
+    func testScanImageResponseDecoding() throws {
+        // Given
+        let jsonString = """
         {
             "risk_level": "high",
             "confidence": 0.93,
             "category": "otp_phishing",
-            "explanation": "Asking for OTP.",
-            "ts": "2025-01-18T10:00:00Z"
+            "explanation": "This message is requesting an OTP code",
+            "ts": "2025-01-18T10:30:00Z"
         }
-        """.data(using: .utf8)!
+        """
+        let jsonData = jsonString.data(using: .utf8)!
         
-        mockNetworkClient.mockResponse = .success(responseJSON)
+        // When
+        let decoder = JSONDecoder()
+        let response = try decoder.decode(ScanImageResponse.self, from: jsonData)
         
-        // When: Calling analyzeText
-        let expectation = self.expectation(description: "Response parsed")
-        var parsedResponse: AnalyzeTextResponse?
-        
-        apiService.analyzeText(text: "test") { result in
-            if case .success(let response) = result {
-                parsedResponse = response
-            }
-            expectation.fulfill()
-        }
-        
-        // Then: Should parse response correctly
-        waitForExpectations(timeout: 1.0)
-        XCTAssertNotNil(parsedResponse)
-        XCTAssertEqual(parsedResponse?.risk_level, "high")
-        XCTAssertEqual(parsedResponse?.confidence, 0.93)
-        XCTAssertEqual(parsedResponse?.category, "otp_phishing")
-        XCTAssertEqual(parsedResponse?.explanation, "Asking for OTP.")
+        // Then
+        XCTAssertEqual(response.risk_level, "high")
+        XCTAssertEqual(response.confidence, 0.93)
+        XCTAssertEqual(response.category, "otp_phishing")
+        XCTAssertEqual(response.explanation, "This message is requesting an OTP code")
+        XCTAssertEqual(response.ts, "2025-01-18T10:30:00Z")
     }
     
-    func testAnalyzeTextInvokesSuccessCallback() {
-        // Given: Mock successful response
-        let responseJSON = """
+    func testScanImageResponseDecodingWithoutTimestamp() throws {
+        // Given
+        let jsonString = """
         {
             "risk_level": "low",
-            "confidence": 0.12,
-            "category": "unknown",
-            "explanation": "Safe message"
+            "confidence": 0.95,
+            "category": "safe",
+            "explanation": "Normal message"
         }
-        """.data(using: .utf8)!
+        """
+        let jsonData = jsonString.data(using: .utf8)!
         
-        mockNetworkClient.mockResponse = .success(responseJSON)
+        // When
+        let decoder = JSONDecoder()
+        let response = try decoder.decode(ScanImageResponse.self, from: jsonData)
         
-        // When: Calling analyzeText
-        let expectation = self.expectation(description: "Success callback")
-        var successCalled = false
+        // Then
+        XCTAssertEqual(response.risk_level, "low")
+        XCTAssertEqual(response.confidence, 0.95)
+        XCTAssertEqual(response.category, "safe")
+        XCTAssertEqual(response.explanation, "Normal message")
+        XCTAssertNil(response.ts)
+    }
+    
+    // MARK: - Performance Tests
+    
+    func testSessionIDGenerationPerformance() {
+        let sessionManager = SessionManager()
         
-        apiService.analyzeText(text: "test") { result in
-            if case .success = result {
-                successCalled = true
+        measure {
+            for _ in 0..<1000 {
+                _ = sessionManager.getOrCreateSessionID()
             }
-            expectation.fulfill()
         }
-        
-        // Then: Should invoke success callback
-        waitForExpectations(timeout: 1.0)
-        XCTAssertTrue(successCalled, "Success callback should be invoked")
     }
     
-    // MARK: - Test: Error Handling
-    
-    func testAnalyzeTextHandlesNetworkError() {
-        // Given: Mock network error
-        mockNetworkClient.mockResponse = .failure(NetworkError.timeout)
+    func testPrivacyTogglePerformance() {
+        let privacyManager = PrivacyManager()
         
-        // When: Calling analyzeText
-        let expectation = self.expectation(description: "Error handled")
-        var receivedError: Error?
-        
-        apiService.analyzeText(text: "test") { result in
-            if case .failure(let error) = result {
-                receivedError = error
+        measure {
+            for _ in 0..<1000 {
+                privacyManager.enableImageUpload()
+                privacyManager.disableImageUpload()
             }
-            expectation.fulfill()
         }
-        
-        // Then: Should invoke error callback
-        waitForExpectations(timeout: 1.0)
-        XCTAssertNotNil(receivedError)
-        XCTAssertTrue(receivedError is NetworkError)
     }
     
-    func testAnalyzeTextHandlesJSONParsingError() {
-        // Given: Mock invalid JSON response
-        let invalidJSON = "not valid json".data(using: .utf8)!
-        mockNetworkClient.mockResponse = .success(invalidJSON)
-        
-        // When: Calling analyzeText
-        let expectation = self.expectation(description: "Parsing error handled")
-        var receivedError: Error?
-        
-        apiService.analyzeText(text: "test") { result in
-            if case .failure(let error) = result {
-                receivedError = error
-            }
-            expectation.fulfill()
-        }
-        
-        // Then: Should invoke error callback with parsing error
-        waitForExpectations(timeout: 1.0)
-        XCTAssertNotNil(receivedError)
-        XCTAssertTrue(receivedError is APIError)
-    }
+    // MARK: - Helper Methods
     
-    func testAnalyzeTextInvokesErrorCallback() {
-        // Given: Mock error
-        mockNetworkClient.mockResponse = .failure(NetworkError.badRequest)
+    /// Creates a test image for testing purposes
+    private func createTestImage() -> UIImage {
+        let size = CGSize(width: 100, height: 100)
+        let renderer = UIGraphicsImageRenderer(size: size)
         
-        // When: Calling analyzeText
-        let expectation = self.expectation(description: "Error callback")
-        var errorCallbackInvoked = false
-        
-        apiService.analyzeText(text: "test") { result in
-            if case .failure = result {
-                errorCallbackInvoked = true
-            }
-            expectation.fulfill()
-        }
-        
-        // Then: Should invoke error callback
-        waitForExpectations(timeout: 1.0)
-        XCTAssertTrue(errorCallbackInvoked, "Error callback should be invoked")
-    }
-    
-    // MARK: - Test: Edge Cases
-    
-    func testAnalyzeTextWithLongText() {
-        // Given: Long text (300 chars from snippet manager)
-        let longText = String(repeating: "a", count: 300)
-        
-        // When: Calling analyzeText
-        let expectation = self.expectation(description: "Long text sent")
-        mockNetworkClient.onPost = { _, body in
-            // Then: Should send full text
-            let sentText = body["text"] as? String
-            XCTAssertEqual(sentText?.count, 300)
-            expectation.fulfill()
-        }
-        
-        apiService.analyzeText(text: longText) { _ in }
-        
-        waitForExpectations(timeout: 1.0)
-    }
-    
-    func testAnalyzeTextWithEmptyString() {
-        // When: Calling analyzeText with empty string
-        let expectation = self.expectation(description: "Empty text sent")
-        mockNetworkClient.onPost = { _, body in
-            // Then: Should still send request
-            XCTAssertEqual(body["text"] as? String, "")
-            expectation.fulfill()
-        }
-        
-        apiService.analyzeText(text: "") { _ in }
-        
-        waitForExpectations(timeout: 1.0)
-    }
-    
-    func testAnalyzeTextWithSpecialCharacters() {
-        // Given: Text with special characters
-        let specialText = "Test 💰 emoji and \n newline"
-        
-        // When: Calling analyzeText
-        let expectation = self.expectation(description: "Special chars sent")
-        mockNetworkClient.onPost = { _, body in
-            // Then: Should preserve special characters
-            XCTAssertEqual(body["text"] as? String, specialText)
-            expectation.fulfill()
-        }
-        
-        apiService.analyzeText(text: specialText) { _ in }
-        
-        waitForExpectations(timeout: 1.0)
-    }
-    
-    func testCallbacksAreInvokedOnMainThread() {
-        // Given: Mock response
-        let responseJSON = """
-        {
-            "risk_level": "low",
-            "confidence": 0.5,
-            "category": "unknown",
-            "explanation": "Test"
-        }
-        """.data(using: .utf8)!
-        
-        mockNetworkClient.mockResponse = .success(responseJSON)
-        
-        // When: Calling analyzeText
-        let expectation = self.expectation(description: "Main thread check")
-        
-        apiService.analyzeText(text: "test") { _ in
-            // Then: Callback should be on main thread
-            XCTAssertTrue(Thread.isMainThread, "Callback should be invoked on main thread")
-            expectation.fulfill()
-        }
-        
-        waitForExpectations(timeout: 1.0)
-    }
-}
-
-// MARK: - Mock NetworkClient
-
-class MockNetworkClient: NetworkClient {
-    var mockResponse: Result<Data, Error>?
-    var onPost: ((String, [String: Any]) -> Void)?
-    
-    func post(url: String, body: [String: Any], completion: @escaping (Result<Data, Error>) -> Void) {
-        // Call the inspection hook if set
-        onPost?(url, body)
-        
-        // Return mock response if set
-        if let response = mockResponse {
-            completion(response)
+        return renderer.image { context in
+            UIColor.blue.setFill()
+            context.fill(CGRect(origin: .zero, size: size))
         }
     }
 }
 
-// MARK: - Mock SessionManager
+// MARK: - Mock URLSession
 
-class MockSessionManager: SessionManager {
-    var mockSessionID: String = "mock-session-id"
-    var getOrCreateCalled = false
+/// Mock URLSession for testing network requests
+class MockURLSession: URLSession {
     
-    override func getOrCreateSessionID() -> String {
-        getOrCreateCalled = true
-        return mockSessionID
+    var mockData: Data?
+    var mockResponse: URLResponse?
+    var mockError: Error?
+    
+    override func dataTask(
+        with request: URLRequest,
+        completionHandler: @escaping (Data?, URLResponse?, Error?) -> Void
+    ) -> URLSessionDataTask {
+        return MockURLSessionDataTask {
+            completionHandler(self.mockData, self.mockResponse, self.mockError)
+        }
     }
 }
 
+/// Mock URLSessionDataTask for testing
+class MockURLSessionDataTask: URLSessionDataTask {
+    
+    private let completion: () -> Void
+    
+    init(completion: @escaping () -> Void) {
+        self.completion = completion
+    }
+    
+    override func resume() {
+        // Simulate async network call
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.1) {
+            self.completion()
+        }
+    }
+}

@@ -44,7 +44,7 @@ def get_model() -> genai.GenerativeModel:
         
         # Initialize model with safety settings
         _model = genai.GenerativeModel(
-            model_name='gemini-1.5-flash-latest',
+            model_name='models/gemini-2.5-flash',
             safety_settings={
                 HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
                 HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
@@ -144,7 +144,8 @@ def detect_mime_type(image_bytes: bytes) -> str:
 async def analyze_image(
     image_data: bytes,
     ocr_text: str = "",
-    mime_type: Optional[str] = None
+    mime_type: Optional[str] = None,
+    user_country: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Analyze image for scam intent using Gemini multimodal API.
@@ -155,11 +156,13 @@ async def analyze_image(
     - 1.5s timeout with graceful fallback
     - Error handling for Gemini API errors
     - Normalized response format
+    - Phone number scam detection based on user's country
     
     Args:
         image_data: Raw image bytes
         ocr_text: OCR-extracted text from image (optional)
         mime_type: MIME type of image (auto-detected if not provided)
+        user_country: User's country code (e.g., "US", "GB", "SG") for phone number analysis
         
     Returns:
         Dict with keys:
@@ -189,7 +192,13 @@ async def analyze_image(
         model = get_model()
         
         # Prepare multimodal content
-        content_parts = [GEMINI_MULTIMODAL_SCAM_PROMPT]
+        prompt = GEMINI_MULTIMODAL_SCAM_PROMPT
+        
+        # Add user country context for phone number analysis
+        if user_country:
+            prompt += f"\n\nIMPORTANT: User is from {user_country}. If you detect phone numbers from DIFFERENT countries in the text/image, this is HIGHLY SUSPICIOUS and should be marked as HIGH RISK (scammers often use foreign numbers). Local numbers from {user_country} are acceptable."
+        
+        content_parts = [prompt]
         
         # Add image
         content_parts.append({

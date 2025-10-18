@@ -11,6 +11,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		03151F862EA3F9E9001430DA /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 038101572EA320B2002E1512 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0381015E2EA320B2002E1512;
+			remoteInfo = TypeSafe;
+		};
 		038101762EA320C5002E1512 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 038101572EA320B2002E1512 /* Project object */;
@@ -35,11 +42,26 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		03151F822EA3F9E9001430DA /* TypeSafeTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TypeSafeTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		0381015F2EA320B2002E1512 /* TypeSafe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TypeSafe.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		038101712EA320C5002E1512 /* TypeSafeKeyboard.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TypeSafeKeyboard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		03151F032EA3E5FF001430DA /* Exceptions for "TypeSafe" folder in "TypeSafe" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 0381015E2EA320B2002E1512 /* TypeSafe */;
+		};
+		031523A92EA3FFF1001430DA /* Exceptions for "TypeSafe" folder in "TypeSafeKeyboard" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Models/ScreenshotNotification.swift,
+			);
+			target = 038101702EA320C5002E1512 /* TypeSafeKeyboard */;
+		};
 		038101792EA320C5002E1512 /* Exceptions for "TypeSafeKeyboard" folder in "TypeSafeKeyboard" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -50,8 +72,17 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		03151F402EA3F971001430DA /* TypeSafeTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TypeSafeTests;
+			sourceTree = "<group>";
+		};
 		038101612EA320B2002E1512 /* TypeSafe */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				03151F032EA3E5FF001430DA /* Exceptions for "TypeSafe" folder in "TypeSafe" target */,
+				031523A92EA3FFF1001430DA /* Exceptions for "TypeSafe" folder in "TypeSafeKeyboard" target */,
+			);
 			path = TypeSafe;
 			sourceTree = "<group>";
 		};
@@ -66,6 +97,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		03151F7F2EA3F9E9001430DA /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		0381015C2EA320B2002E1512 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -88,6 +126,7 @@
 			children = (
 				038101612EA320B2002E1512 /* TypeSafe */,
 				038101722EA320C5002E1512 /* TypeSafeKeyboard */,
+				03151F402EA3F971001430DA /* TypeSafeTests */,
 				038101602EA320B2002E1512 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -97,6 +136,7 @@
 			children = (
 				0381015F2EA320B2002E1512 /* TypeSafe.app */,
 				038101712EA320C5002E1512 /* TypeSafeKeyboard.appex */,
+				03151F822EA3F9E9001430DA /* TypeSafeTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -104,6 +144,26 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		03151F812EA3F9E9001430DA /* TypeSafeTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 03151F882EA3F9E9001430DA /* Build configuration list for PBXNativeTarget "TypeSafeTests" */;
+			buildPhases = (
+				03151F7E2EA3F9E9001430DA /* Sources */,
+				03151F7F2EA3F9E9001430DA /* Frameworks */,
+				03151F802EA3F9E9001430DA /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				03151F872EA3F9E9001430DA /* PBXTargetDependency */,
+			);
+			name = TypeSafeTests;
+			packageProductDependencies = (
+			);
+			productName = TypeSafeTests;
+			productReference = 03151F822EA3F9E9001430DA /* TypeSafeTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 		0381015E2EA320B2002E1512 /* TypeSafe */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 0381016A2EA320B3002E1512 /* Build configuration list for PBXNativeTarget "TypeSafe" */;
@@ -160,6 +220,10 @@
 				LastSwiftUpdateCheck = 2600;
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
+					03151F812EA3F9E9001430DA = {
+						CreatedOnToolsVersion = 26.0.1;
+						TestTargetID = 0381015E2EA320B2002E1512;
+					};
 					0381015E2EA320B2002E1512 = {
 						CreatedOnToolsVersion = 26.0.1;
 					};
@@ -184,11 +248,19 @@
 			targets = (
 				0381015E2EA320B2002E1512 /* TypeSafe */,
 				038101702EA320C5002E1512 /* TypeSafeKeyboard */,
+				03151F812EA3F9E9001430DA /* TypeSafeTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		03151F802EA3F9E9001430DA /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		0381015D2EA320B2002E1512 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -206,6 +278,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		03151F7E2EA3F9E9001430DA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		0381015B2EA320B2002E1512 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -223,6 +302,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		03151F872EA3F9E9001430DA /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0381015E2EA320B2002E1512 /* TypeSafe */;
+			targetProxy = 03151F862EA3F9E9001430DA /* PBXContainerItemProxy */;
+		};
 		038101772EA320C5002E1512 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 038101702EA320C5002E1512 /* TypeSafeKeyboard */;
@@ -231,6 +315,48 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		03151F892EA3F9E9001430DA /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WNJQ8DDMYX;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.leongwenxuan.TypeSafe.TypeSafeTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TypeSafe.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TypeSafe";
+			};
+			name = Debug;
+		};
+		03151F8A2EA3F9E9001430DA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WNJQ8DDMYX;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.leongwenxuan.TypeSafe.TypeSafeTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TypeSafe.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/TypeSafe";
+			};
+			name = Release;
+		};
 		038101682EA320B3002E1512 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -363,6 +489,10 @@
 				DEVELOPMENT_TEAM = WNJQ8DDMYX;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TypeSafe/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = TypeSafe;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs photo access to allow users to upload scam screenshots for analysis.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -396,6 +526,10 @@
 				DEVELOPMENT_TEAM = WNJQ8DDMYX;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TypeSafe/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = TypeSafe;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "This app needs photo access to allow users to upload scam screenshots for analysis.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -479,6 +613,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		03151F882EA3F9E9001430DA /* Build configuration list for PBXNativeTarget "TypeSafeTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				03151F892EA3F9E9001430DA /* Debug */,
+				03151F8A2EA3F9E9001430DA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		0381015A2EA320B2002E1512 /* Build configuration list for PBXProject "TypeSafe" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

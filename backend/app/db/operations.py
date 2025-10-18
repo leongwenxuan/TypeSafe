@@ -7,7 +7,7 @@ in the migrations. Functions handle error checking and return structured data.
 
 from typing import Dict, Any, Optional, List
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timezone
 from .client import get_supabase_client
 
 
@@ -28,7 +28,7 @@ def insert_session(session_id: UUID) -> Dict[str, Any]:
     
     data = {
         "session_id": str(session_id),
-        "created_at": datetime.utcnow().isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat()
     }
     
     response = client.table("sessions").insert(data).execute()
@@ -37,6 +37,48 @@ def insert_session(session_id: UUID) -> Dict[str, Any]:
         raise Exception("Failed to insert session")
     
     return response.data[0]
+
+
+def get_session(session_id: UUID) -> Optional[Dict[str, Any]]:
+    """
+    Get a session record by session_id.
+    
+    Args:
+        session_id: UUID identifying the session
+        
+    Returns:
+        Dict containing the session data, or None if not found
+    """
+    client = get_supabase_client()
+    
+    response = client.table("sessions")\
+        .select("*")\
+        .eq("session_id", str(session_id))\
+        .execute()
+    
+    return response.data[0] if response.data else None
+
+
+def ensure_session_exists(session_id: UUID) -> Dict[str, Any]:
+    """
+    Ensure a session exists, creating it if it doesn't.
+    
+    Args:
+        session_id: UUID identifying the session
+        
+    Returns:
+        Dict containing the session data (existing or newly created)
+        
+    Raises:
+        Exception: If session creation fails
+    """
+    # Check if session already exists
+    existing_session = get_session(session_id)
+    if existing_session:
+        return existing_session
+    
+    # Session doesn't exist, create it
+    return insert_session(session_id)
 
 
 def insert_text_analysis(
@@ -84,7 +126,7 @@ def insert_text_analysis(
         "confidence": risk_data.get("confidence", 0.0),
         "category": risk_data.get("category", ""),
         "explanation": risk_data.get("explanation", ""),
-        "created_at": datetime.utcnow().isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat()
     }
     
     response = client.table("text_analyses").insert(data).execute()
@@ -127,7 +169,7 @@ def insert_scan_result(
         "confidence": risk_data.get("confidence", 0.0),
         "category": risk_data.get("category", ""),
         "explanation": risk_data.get("explanation", ""),
-        "created_at": datetime.utcnow().isoformat()
+        "created_at": datetime.now(timezone.utc).isoformat()
     }
     
     response = client.table("scan_results").insert(data).execute()

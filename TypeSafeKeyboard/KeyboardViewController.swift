@@ -23,6 +23,17 @@ class KeyboardViewController: UIInputViewController {
     private var currentLayout: KeyboardLayout = .letters
     private var heightConstraint: NSLayoutConstraint?
     
+    // MARK: - Color Constants (Story 6.1)
+    // Light mode colors - Apple-like neutral scheme
+    private let lightKeyBackground = UIColor(white: 0.97, alpha: 1.0)  // #F8F8F8
+    private let lightKeyboardBackground = UIColor(white: 0.85, alpha: 1.0)  // #D9D9D9
+    private let lightTextColor = UIColor.black
+    
+    // Dark mode colors - Apple-like neutral scheme
+    private let darkKeyBackground = UIColor(white: 0.29, alpha: 1.0)  // #4A4A4A
+    private let darkKeyboardBackground = UIColor(white: 0.10, alpha: 1.0)  // #191919
+    private let darkTextColor = UIColor.white
+    
     // Performance optimization caches (Story 2.9)
     private var cachedShiftButton: UIButton?
     private var cachedKeyboardAppearance: UIKeyboardAppearance?
@@ -115,9 +126,10 @@ class KeyboardViewController: UIInputViewController {
         // Only create height constraint once to avoid conflicts
         if heightConstraint == nil {
             print("KeyboardViewController: Creating height constraint")
-            // Adjusted height to match actual content: 38+38+38+32 + 3*3 spacing + 3+3 padding = 155pt
-            // Add 60pt for banner above keyboard (Story 2.6): 224 + 60 = 284pt
-            heightConstraint = view.heightAnchor.constraint(equalToConstant: 284)
+            // Story 6.2: Increased keyboard height for better usability
+            // New height calculation: 46+46+46+38 + 4*3 spacing + 4+4 padding = 260pt
+            // Add 60pt for banner above keyboard: 260 + 60 = 320pt
+            heightConstraint = view.heightAnchor.constraint(equalToConstant: 320)
             heightConstraint?.priority = UILayoutPriority(999) // Slightly less than required
             heightConstraint?.isActive = true
         }
@@ -166,6 +178,7 @@ class KeyboardViewController: UIInputViewController {
         print("KeyboardViewController: setupKeyboard started")
         
         // Performance optimization: Clear caches when recreating keyboard (Story 2.9)
+        // Story 6.1: Clear layout cache to force rebuild with correct colors and padding
         clearPerformanceCaches()
         
         // Clean up any existing views (Full Access recreation)
@@ -175,7 +188,8 @@ class KeyboardViewController: UIInputViewController {
         
         // Create main container
         keyboardView = UIView()
-        keyboardView.backgroundColor = UIColor.systemBackground
+        // Story 6.1: Transparent background to show native iOS blur effect
+        keyboardView.backgroundColor = .clear
         keyboardView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(keyboardView)
         
@@ -201,15 +215,21 @@ class KeyboardViewController: UIInputViewController {
     private func createKeyboardLayout() {
         print("KeyboardViewController: createKeyboardLayout started (layout: \(currentLayout))")
         
+        // Clean up existing keyboard layout views first
+        keyboardView.subviews.forEach { $0.removeFromSuperview() }
+        
         // Performance optimization: Use cached layout if available (Story 2.9)
         if let cachedLayout = layoutCache[currentLayout] {
             print("KeyboardViewController: Using cached layout for \(currentLayout)")
             
-            // Clean up existing keyboard layout views
-            keyboardView.subviews.forEach { $0.removeFromSuperview() }
+            // Remove cached layout from its superview if it has one
+            cachedLayout.removeFromSuperview()
             
             // Add cached layout
             keyboardView.addSubview(cachedLayout)
+            
+            // Reset any existing constraints on the cached layout
+            cachedLayout.translatesAutoresizingMaskIntoConstraints = false
             
             // Setup constraints for cached layout
             NSLayoutConstraint.activate([
@@ -219,15 +239,15 @@ class KeyboardViewController: UIInputViewController {
                 cachedLayout.bottomAnchor.constraint(equalTo: keyboardView.bottomAnchor)
             ])
             
+            // Force immediate layout to prevent alignment issues
+            cachedLayout.layoutIfNeeded()
+            
             // Update appearance for cached layout
             updateAppearanceForLayout(cachedLayout)
             
             print("KeyboardViewController: Cached layout applied")
             return
         }
-        
-        // Clean up existing keyboard layout views
-        keyboardView.subviews.forEach { $0.removeFromSuperview() }
         
         // Create new layout and cache it
         let newLayout: UIView
@@ -251,25 +271,25 @@ class KeyboardViewController: UIInputViewController {
         let mainStackView = UIStackView()
         mainStackView.axis = .vertical
         mainStackView.distribution = .fill
-        mainStackView.spacing = 3
+        mainStackView.spacing = 4  // Story 6.2: Increased from 3pt to 4pt
         mainStackView.translatesAutoresizingMaskIntoConstraints = false
         keyboardView.addSubview(mainStackView)
         
         NSLayoutConstraint.activate([
-            mainStackView.leftAnchor.constraint(equalTo: keyboardView.leftAnchor, constant: 3),
-            mainStackView.rightAnchor.constraint(equalTo: keyboardView.rightAnchor, constant: -3),
-            mainStackView.topAnchor.constraint(equalTo: keyboardView.topAnchor, constant: 3),
-            mainStackView.bottomAnchor.constraint(equalTo: keyboardView.bottomAnchor, constant: -3)
+            mainStackView.leftAnchor.constraint(equalTo: keyboardView.leftAnchor, constant: 4),  // Story 6.2: Increased from 3pt to 4pt
+            mainStackView.rightAnchor.constraint(equalTo: keyboardView.rightAnchor, constant: -4),
+            mainStackView.topAnchor.constraint(equalTo: keyboardView.topAnchor, constant: 4),
+            mainStackView.bottomAnchor.constraint(equalTo: keyboardView.bottomAnchor, constant: -4)
         ])
         
         // Row 1: Q W E R T Y U I O P
         let row1 = createKeyRow(keys: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"])
-        row1.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        row1.heightAnchor.constraint(equalToConstant: 46).isActive = true  // Story 6.2: Increased from 38pt to 46pt
         mainStackView.addArrangedSubview(row1)
         
         // Row 2: A S D F G H J K L (with side padding)
         let row2Container = UIView()
-        row2Container.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        row2Container.heightAnchor.constraint(equalToConstant: 46).isActive = true  // Story 6.2: Increased from 38pt to 46pt
         let row2 = createKeyRow(keys: ["A", "S", "D", "F", "G", "H", "J", "K", "L"])
         row2.translatesAutoresizingMaskIntoConstraints = false
         row2Container.addSubview(row2)
@@ -284,12 +304,12 @@ class KeyboardViewController: UIInputViewController {
         
         // Row 3: Shift + Z X C V B N M + Backspace
         let row3 = createRow3()
-        row3.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        row3.heightAnchor.constraint(equalToConstant: 46).isActive = true  // Story 6.2: Increased from 38pt to 46pt
         mainStackView.addArrangedSubview(row3)
         
         // Row 4: 123 + Next Keyboard + Space + Return
         let row4 = createRow4()
-        row4.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        row4.heightAnchor.constraint(equalToConstant: 38).isActive = true  // Story 6.2: Increased from 32pt to 38pt
         mainStackView.addArrangedSubview(row4)
         
         print("KeyboardViewController: Letter layout created")
@@ -300,32 +320,32 @@ class KeyboardViewController: UIInputViewController {
         let mainStackView = UIStackView()
         mainStackView.axis = .vertical
         mainStackView.distribution = .fill
-        mainStackView.spacing = 3
+        mainStackView.spacing = 4  // Story 6.2: Increased from 3pt to 4pt
         mainStackView.translatesAutoresizingMaskIntoConstraints = false
         keyboardView.addSubview(mainStackView)
         
         NSLayoutConstraint.activate([
-            mainStackView.leftAnchor.constraint(equalTo: keyboardView.leftAnchor, constant: 3),
-            mainStackView.rightAnchor.constraint(equalTo: keyboardView.rightAnchor, constant: -3),
-            mainStackView.topAnchor.constraint(equalTo: keyboardView.topAnchor, constant: 3),
-            mainStackView.bottomAnchor.constraint(equalTo: keyboardView.bottomAnchor, constant: -3)
+            mainStackView.leftAnchor.constraint(equalTo: keyboardView.leftAnchor, constant: 4),  // Story 6.2: Increased from 3pt to 4pt
+            mainStackView.rightAnchor.constraint(equalTo: keyboardView.rightAnchor, constant: -4),
+            mainStackView.topAnchor.constraint(equalTo: keyboardView.topAnchor, constant: 4),
+            mainStackView.bottomAnchor.constraint(equalTo: keyboardView.bottomAnchor, constant: -4)
         ])
         
         // Row 1: 1 2 3 4 5 6 7 8 9 0
         let row1 = createKeyRow(keys: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"])
-        row1.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        row1.heightAnchor.constraint(equalToConstant: 46).isActive = true  // Story 6.2: Increased from 38pt to 46pt
         mainStackView.addArrangedSubview(row1)
         
         // Row 2: - / : ; ( ) $ & @ "
         let row2 = createKeyRow(keys: ["-", "/", ":", ";", "(", ")", "$", "&", "@", "\""])
-        row2.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        row2.heightAnchor.constraint(equalToConstant: 46).isActive = true  // Story 6.2: Increased from 38pt to 46pt
         mainStackView.addArrangedSubview(row2)
         
         // Row 3: #+= button + . , ? ! ' + Backspace
         let row3 = UIStackView()
         row3.axis = .horizontal
         row3.spacing = 4
-        row3.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        row3.heightAnchor.constraint(equalToConstant: 46).isActive = true  // Story 6.2: Increased from 38pt to 46pt
         
         let symbolModeButton = createKeyButton(title: "#+=", action: #selector(symbolModeTapped))
         symbolModeButton.widthAnchor.constraint(equalToConstant: 45).isActive = true
@@ -344,7 +364,7 @@ class KeyboardViewController: UIInputViewController {
         let row4 = UIStackView()
         row4.axis = .horizontal
         row4.spacing = 6
-        row4.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        row4.heightAnchor.constraint(equalToConstant: 38).isActive = true  // Story 6.2: Increased from 32pt to 38pt
         
         let abcButton = createKeyButton(title: "ABC", action: #selector(letterModeTapped))
         abcButton.widthAnchor.constraint(equalToConstant: 42).isActive = true
@@ -374,32 +394,32 @@ class KeyboardViewController: UIInputViewController {
         let mainStackView = UIStackView()
         mainStackView.axis = .vertical
         mainStackView.distribution = .fill
-        mainStackView.spacing = 3
+        mainStackView.spacing = 4  // Story 6.2: Increased from 3pt to 4pt
         mainStackView.translatesAutoresizingMaskIntoConstraints = false
         keyboardView.addSubview(mainStackView)
         
         NSLayoutConstraint.activate([
-            mainStackView.leftAnchor.constraint(equalTo: keyboardView.leftAnchor, constant: 3),
-            mainStackView.rightAnchor.constraint(equalTo: keyboardView.rightAnchor, constant: -3),
-            mainStackView.topAnchor.constraint(equalTo: keyboardView.topAnchor, constant: 3),
-            mainStackView.bottomAnchor.constraint(equalTo: keyboardView.bottomAnchor, constant: -3)
+            mainStackView.leftAnchor.constraint(equalTo: keyboardView.leftAnchor, constant: 4),  // Story 6.2: Increased from 3pt to 4pt
+            mainStackView.rightAnchor.constraint(equalTo: keyboardView.rightAnchor, constant: -4),
+            mainStackView.topAnchor.constraint(equalTo: keyboardView.topAnchor, constant: 4),
+            mainStackView.bottomAnchor.constraint(equalTo: keyboardView.bottomAnchor, constant: -4)
         ])
         
         // Row 1: [ ] { } # % ^ * + =
         let row1 = createKeyRow(keys: ["[", "]", "{", "}", "#", "%", "^", "*", "+", "="])
-        row1.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        row1.heightAnchor.constraint(equalToConstant: 46).isActive = true  // Story 6.2: Increased from 38pt to 46pt
         mainStackView.addArrangedSubview(row1)
         
         // Row 2: _ \ | ~ < > $ £ ¥ •
         let row2 = createKeyRow(keys: ["_", "\\", "|", "~", "<", ">", "$", "£", "¥", "•"])
-        row2.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        row2.heightAnchor.constraint(equalToConstant: 46).isActive = true  // Story 6.2: Increased from 38pt to 46pt
         mainStackView.addArrangedSubview(row2)
         
         // Row 3: 123 button + . , ? ! ' + Backspace
         let row3 = UIStackView()
         row3.axis = .horizontal
         row3.spacing = 4
-        row3.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        row3.heightAnchor.constraint(equalToConstant: 46).isActive = true  // Story 6.2: Increased from 38pt to 46pt
         
         let numberModeButton = createKeyButton(title: "123", action: #selector(numberModeTapped))
         numberModeButton.widthAnchor.constraint(equalToConstant: 45).isActive = true
@@ -418,7 +438,7 @@ class KeyboardViewController: UIInputViewController {
         let row4 = UIStackView()
         row4.axis = .horizontal
         row4.spacing = 6
-        row4.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        row4.heightAnchor.constraint(equalToConstant: 38).isActive = true  // Story 6.2: Increased from 32pt to 38pt
         
         let abcButton = createKeyButton(title: "ABC", action: #selector(letterModeTapped))
         abcButton.widthAnchor.constraint(equalToConstant: 42).isActive = true
@@ -515,11 +535,11 @@ class KeyboardViewController: UIInputViewController {
     }
     
     private func createKeyButton(title: String, action: Selector) -> UIButton {
-        let button = UIButton(type: .system)
+        let button = UIButton(type: .custom)  // Story 6.1: Changed from .system to .custom to avoid blue tint color
         button.setTitle(title, for: .normal)
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 18, weight: .regular) // Slightly smaller font
-        button.layer.cornerRadius = 6 // More rounded corners like Apple keyboard
-        button.layer.borderWidth = 0 // Remove border for cleaner look
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 20, weight: .regular)  // Story 6.2: Increased from 18pt to 20pt for better visual balance with larger keys
+        button.layer.cornerRadius = 6  // More rounded corners like Apple keyboard
+        button.layer.borderWidth = 0  // Remove border for cleaner look
         button.addTarget(self, action: action, for: .touchUpInside)
         
         // Add shadow for depth (like Apple keyboard)
@@ -527,6 +547,13 @@ class KeyboardViewController: UIInputViewController {
         button.layer.shadowOffset = CGSize(width: 0, height: 1)
         button.layer.shadowOpacity = 0.15
         button.layer.shadowRadius = 0
+        
+        // Story 6.1: Set initial colors (will be updated by updateAppearance)
+        // Check both textDocumentProxy and traitCollection for more reliable dark mode detection
+        let isDark = textDocumentProxy.keyboardAppearance == .dark || 
+                     (textDocumentProxy.keyboardAppearance == .default && traitCollection.userInterfaceStyle == .dark)
+        button.backgroundColor = isDark ? darkKeyBackground : lightKeyBackground
+        button.setTitleColor(isDark ? darkTextColor : lightTextColor, for: .normal)
         
         return button
     }
@@ -542,25 +569,25 @@ class KeyboardViewController: UIInputViewController {
         let mainStackView = UIStackView()
         mainStackView.axis = .vertical
         mainStackView.distribution = .fill
-        mainStackView.spacing = 3
+        mainStackView.spacing = 4  // Story 6.2: Increased from 3pt to 4pt
         mainStackView.translatesAutoresizingMaskIntoConstraints = false
         containerView.addSubview(mainStackView)
         
         NSLayoutConstraint.activate([
-            mainStackView.leftAnchor.constraint(equalTo: containerView.leftAnchor, constant: 3),
-            mainStackView.rightAnchor.constraint(equalTo: containerView.rightAnchor, constant: -3),
-            mainStackView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 3),
-            mainStackView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -3)
+            mainStackView.leftAnchor.constraint(equalTo: containerView.leftAnchor, constant: 4),  // Story 6.2: Increased from 3pt to 4pt
+            mainStackView.rightAnchor.constraint(equalTo: containerView.rightAnchor, constant: -4),
+            mainStackView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 4),
+            mainStackView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -4)
         ])
         
         // Row 1: Q W E R T Y U I O P
         let row1 = createKeyRow(keys: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"])
-        row1.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        row1.heightAnchor.constraint(equalToConstant: 46).isActive = true  // Story 6.2: Increased from 38pt to 46pt
         mainStackView.addArrangedSubview(row1)
         
         // Row 2: A S D F G H J K L (with side padding)
         let row2Container = UIView()
-        row2Container.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        row2Container.heightAnchor.constraint(equalToConstant: 46).isActive = true  // Story 6.2: Increased from 38pt to 46pt
         let row2 = createKeyRow(keys: ["A", "S", "D", "F", "G", "H", "J", "K", "L"])
         row2.translatesAutoresizingMaskIntoConstraints = false
         row2Container.addSubview(row2)
@@ -575,12 +602,12 @@ class KeyboardViewController: UIInputViewController {
         
         // Row 3: Shift + Z X C V B N M + Backspace
         let row3 = createRow3()
-        row3.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        row3.heightAnchor.constraint(equalToConstant: 46).isActive = true  // Story 6.2: Increased from 38pt to 46pt
         mainStackView.addArrangedSubview(row3)
         
         // Row 4: 123 + Next Keyboard + Space + Return
         let row4 = createRow4()
-        row4.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        row4.heightAnchor.constraint(equalToConstant: 38).isActive = true  // Story 6.2: Increased from 32pt to 38pt
         mainStackView.addArrangedSubview(row4)
         
         // Add to keyboard view
@@ -600,11 +627,86 @@ class KeyboardViewController: UIInputViewController {
         let containerView = UIView()
         containerView.translatesAutoresizingMaskIntoConstraints = false
         
-        // Create number layout using existing logic
-        createNumberLayout()
+        // Main stack view to hold all rows
+        let mainStackView = UIStackView()
+        mainStackView.axis = .vertical
+        mainStackView.distribution = .fill
+        mainStackView.spacing = 4  // Story 6.2: Increased from 3pt to 4pt
+        mainStackView.translatesAutoresizingMaskIntoConstraints = false
+        containerView.addSubview(mainStackView)
         
-        // Return the created layout (simplified for now - could be further optimized)
-        return keyboardView.subviews.first ?? containerView
+        NSLayoutConstraint.activate([
+            mainStackView.leftAnchor.constraint(equalTo: containerView.leftAnchor, constant: 4),
+            mainStackView.rightAnchor.constraint(equalTo: containerView.rightAnchor, constant: -4),
+            mainStackView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 4),
+            mainStackView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -4)
+        ])
+        
+        // Row 1: 1 2 3 4 5 6 7 8 9 0
+        let row1 = createKeyRow(keys: ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"])
+        row1.heightAnchor.constraint(equalToConstant: 46).isActive = true
+        mainStackView.addArrangedSubview(row1)
+        
+        // Row 2: - / : ; ( ) $ & @ "
+        let row2 = createKeyRow(keys: ["-", "/", ":", ";", "(", ")", "$", "&", "@", "\""])
+        row2.heightAnchor.constraint(equalToConstant: 46).isActive = true
+        mainStackView.addArrangedSubview(row2)
+        
+        // Row 3: #+= button + . , ? ! ' + Backspace
+        let row3 = UIStackView()
+        row3.axis = .horizontal
+        row3.spacing = 4
+        row3.heightAnchor.constraint(equalToConstant: 46).isActive = true
+        
+        let symbolModeButton = createKeyButton(title: "#+=", action: #selector(symbolModeTapped))
+        symbolModeButton.widthAnchor.constraint(equalToConstant: 45).isActive = true
+        row3.addArrangedSubview(symbolModeButton)
+        
+        let punctuationKeys = createKeyRow(keys: [".", ",", "?", "!", "'"])
+        row3.addArrangedSubview(punctuationKeys)
+        
+        let backspaceButton = createKeyButton(title: "⌫", action: #selector(backspaceTapped))
+        backspaceButton.widthAnchor.constraint(equalToConstant: 45).isActive = true
+        row3.addArrangedSubview(backspaceButton)
+        
+        mainStackView.addArrangedSubview(row3)
+        
+        // Row 4: ABC + Globe + Space + Return
+        let row4 = UIStackView()
+        row4.axis = .horizontal
+        row4.spacing = 6
+        row4.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        
+        let abcButton = createKeyButton(title: "ABC", action: #selector(letterModeTapped))
+        abcButton.widthAnchor.constraint(equalToConstant: 42).isActive = true
+        row4.addArrangedSubview(abcButton)
+        
+        let nextKeyboardButton = createKeyButton(title: "🌐", action: #selector(handleInputModeList(from:with:)))
+        nextKeyboardButton.widthAnchor.constraint(equalToConstant: 42).isActive = true
+        if !needsInputModeSwitchKey {
+            nextKeyboardButton.isHidden = true
+        }
+        row4.addArrangedSubview(nextKeyboardButton)
+        
+        let spaceButton = createKeyButton(title: "space", action: #selector(spaceTapped))
+        row4.addArrangedSubview(spaceButton)
+        
+        let returnButton = createKeyButton(title: "return", action: #selector(returnTapped))
+        returnButton.widthAnchor.constraint(equalToConstant: 67).isActive = true
+        row4.addArrangedSubview(returnButton)
+        
+        mainStackView.addArrangedSubview(row4)
+        
+        // Add to keyboard view
+        keyboardView.addSubview(containerView)
+        NSLayoutConstraint.activate([
+            containerView.leftAnchor.constraint(equalTo: keyboardView.leftAnchor),
+            containerView.rightAnchor.constraint(equalTo: keyboardView.rightAnchor),
+            containerView.topAnchor.constraint(equalTo: keyboardView.topAnchor),
+            containerView.bottomAnchor.constraint(equalTo: keyboardView.bottomAnchor)
+        ])
+        
+        return containerView
     }
     
     /// Creates optimized symbol layout that returns a view for caching
@@ -612,30 +714,105 @@ class KeyboardViewController: UIInputViewController {
         let containerView = UIView()
         containerView.translatesAutoresizingMaskIntoConstraints = false
         
-        // Create symbol layout using existing logic
-        createSymbolLayout()
+        // Main stack view to hold all rows
+        let mainStackView = UIStackView()
+        mainStackView.axis = .vertical
+        mainStackView.distribution = .fill
+        mainStackView.spacing = 4  // Story 6.2: Increased from 3pt to 4pt
+        mainStackView.translatesAutoresizingMaskIntoConstraints = false
+        containerView.addSubview(mainStackView)
         
-        // Return the created layout (simplified for now - could be further optimized)
-        return keyboardView.subviews.first ?? containerView
+        NSLayoutConstraint.activate([
+            mainStackView.leftAnchor.constraint(equalTo: containerView.leftAnchor, constant: 4),
+            mainStackView.rightAnchor.constraint(equalTo: containerView.rightAnchor, constant: -4),
+            mainStackView.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 4),
+            mainStackView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -4)
+        ])
+        
+        // Row 1: [ ] { } # % ^ * + =
+        let row1 = createKeyRow(keys: ["[", "]", "{", "}", "#", "%", "^", "*", "+", "="])
+        row1.heightAnchor.constraint(equalToConstant: 46).isActive = true
+        mainStackView.addArrangedSubview(row1)
+        
+        // Row 2: _ \ | ~ < > $ £ ¥ •
+        let row2 = createKeyRow(keys: ["_", "\\", "|", "~", "<", ">", "$", "£", "¥", "•"])
+        row2.heightAnchor.constraint(equalToConstant: 46).isActive = true
+        mainStackView.addArrangedSubview(row2)
+        
+        // Row 3: 123 button + . , ? ! ' + Backspace
+        let row3 = UIStackView()
+        row3.axis = .horizontal
+        row3.spacing = 4
+        row3.heightAnchor.constraint(equalToConstant: 46).isActive = true
+        
+        let numberModeButton = createKeyButton(title: "123", action: #selector(numberModeTapped))
+        numberModeButton.widthAnchor.constraint(equalToConstant: 45).isActive = true
+        row3.addArrangedSubview(numberModeButton)
+        
+        let punctuationKeys = createKeyRow(keys: [".", ",", "?", "!", "'"])
+        row3.addArrangedSubview(punctuationKeys)
+        
+        let backspaceButton = createKeyButton(title: "⌫", action: #selector(backspaceTapped))
+        backspaceButton.widthAnchor.constraint(equalToConstant: 45).isActive = true
+        row3.addArrangedSubview(backspaceButton)
+        
+        mainStackView.addArrangedSubview(row3)
+        
+        // Row 4: ABC + Globe + Space + Return
+        let row4 = UIStackView()
+        row4.axis = .horizontal
+        row4.spacing = 6
+        row4.heightAnchor.constraint(equalToConstant: 38).isActive = true
+        
+        let abcButton = createKeyButton(title: "ABC", action: #selector(letterModeTapped))
+        abcButton.widthAnchor.constraint(equalToConstant: 42).isActive = true
+        row4.addArrangedSubview(abcButton)
+        
+        let nextKeyboardButton = createKeyButton(title: "🌐", action: #selector(handleInputModeList(from:with:)))
+        nextKeyboardButton.widthAnchor.constraint(equalToConstant: 42).isActive = true
+        if !needsInputModeSwitchKey {
+            nextKeyboardButton.isHidden = true
+        }
+        row4.addArrangedSubview(nextKeyboardButton)
+        
+        let spaceButton = createKeyButton(title: "space", action: #selector(spaceTapped))
+        row4.addArrangedSubview(spaceButton)
+        
+        let returnButton = createKeyButton(title: "return", action: #selector(returnTapped))
+        returnButton.widthAnchor.constraint(equalToConstant: 67).isActive = true
+        row4.addArrangedSubview(returnButton)
+        
+        mainStackView.addArrangedSubview(row4)
+        
+        // Add to keyboard view
+        keyboardView.addSubview(containerView)
+        NSLayoutConstraint.activate([
+            containerView.leftAnchor.constraint(equalTo: keyboardView.leftAnchor),
+            containerView.rightAnchor.constraint(equalTo: keyboardView.rightAnchor),
+            containerView.topAnchor.constraint(equalTo: keyboardView.topAnchor),
+            containerView.bottomAnchor.constraint(equalTo: keyboardView.bottomAnchor)
+        ])
+        
+        return containerView
     }
     
     /// Updates appearance for a specific layout view (Story 2.9)
     private func updateAppearanceForLayout(_ layoutView: UIView) {
         let isDark = textDocumentProxy.keyboardAppearance == .dark
         
-        // Cache appearance to avoid repeated checks
-        if cachedKeyboardAppearance == textDocumentProxy.keyboardAppearance {
-            return // No change needed
-        }
-        cachedKeyboardAppearance = textDocumentProxy.keyboardAppearance
+        // Story 6.1: Always update cached layouts to ensure color consistency
+        // (Removed cache check to fix color issues when switching layouts)
         
-        // Background color for keyboard
-        keyboardView.backgroundColor = isDark ? UIColor(white: 0.1, alpha: 1.0) : UIColor(white: 0.85, alpha: 1.0)
+        // Story 6.1: Keep background transparent to show native iOS blur
+        keyboardView.backgroundColor = .clear
         
         // Update buttons in the layout
         if let mainStackView = layoutView.subviews.first as? UIStackView {
             updateStackViewButtons(mainStackView, isDark: isDark)
         }
+        
+        // Update the cached appearance
+        cachedKeyboardAppearance = textDocumentProxy.keyboardAppearance
     }
     
     // MARK: - Appearance
@@ -644,8 +821,8 @@ class KeyboardViewController: UIInputViewController {
         
         let isDark = textDocumentProxy.keyboardAppearance == .dark
         
-        // Background color for keyboard
-        keyboardView.backgroundColor = isDark ? UIColor(white: 0.1, alpha: 1.0) : UIColor(white: 0.85, alpha: 1.0)
+        // Story 6.1: Keep background transparent to show native iOS blur
+        keyboardView.backgroundColor = .clear
         
         // Update all buttons - find the main stack view
         if let mainStackView = keyboardView.subviews.first as? UIStackView {
@@ -657,21 +834,23 @@ class KeyboardViewController: UIInputViewController {
     }
     
     private func updateStackViewButtons(_ stackView: UIStackView, isDark: Bool) {
+        // Story 6.1: Use color constants for all keys consistently
+        let keyColor = isDark ? darkKeyBackground : lightKeyBackground
+        let textColor = isDark ? darkTextColor : lightTextColor
+        
         for view in stackView.arrangedSubviews {
             if let button = view as? UIButton {
-                // Key background - using more Apple-like colors
-                button.backgroundColor = isDark ? UIColor(white: 0.3, alpha: 1.0) : UIColor(white: 0.98, alpha: 1.0)
-                // Key text
-                button.setTitleColor(isDark ? .white : .black, for: .normal)
-                // No border styling needed anymore
+                // Apply consistent color scheme to all keys
+                button.backgroundColor = keyColor
+                button.setTitleColor(textColor, for: .normal)
             } else if let nestedStack = view as? UIStackView {
                 updateStackViewButtons(nestedStack, isDark: isDark)
             } else {
                 // Handle container views
                 for subview in view.subviews {
                     if let button = subview as? UIButton {
-                        button.backgroundColor = isDark ? UIColor(white: 0.3, alpha: 1.0) : UIColor(white: 0.98, alpha: 1.0)
-                        button.setTitleColor(isDark ? .white : .black, for: .normal)
+                        button.backgroundColor = keyColor
+                        button.setTitleColor(textColor, for: .normal)
                     } else if let nestedStack = subview as? UIStackView {
                         updateStackViewButtons(nestedStack, isDark: isDark)
                     }
@@ -757,9 +936,12 @@ class KeyboardViewController: UIInputViewController {
     // Optimized method to update a single shift button (Story 2.9)
     private func updateSingleShiftButton(_ button: UIButton) {
         let isDark = textDocumentProxy.keyboardAppearance == .dark
-        button.backgroundColor = isShifted ? 
-            (isDark ? UIColor(white: 0.5, alpha: 1.0) : UIColor(white: 0.8, alpha: 1.0)) : 
-            (isDark ? UIColor(white: 0.3, alpha: 1.0) : UIColor(white: 0.98, alpha: 1.0))
+        
+        // Story 6.1: Use color constants, with slight modification for shifted state
+        let normalColor = isDark ? darkKeyBackground : lightKeyBackground
+        let shiftedColor = isDark ? UIColor(white: 0.5, alpha: 1.0) : UIColor(white: 0.8, alpha: 1.0)
+        
+        button.backgroundColor = isShifted ? shiftedColor : normalColor
     }
     
     @objc private func backspaceTapped() {

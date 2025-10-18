@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flower
+  namespace: typesafe
+  labels:
+    app: flower
+    component: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flower
+  template:
+    metadata:
+      labels:
+        app: flower
+        component: monitoring
+    spec:
+      containers:
+      - name: flower
+        image: typesafe-backend:latest  # Update with your image
+        imagePullPolicy: IfNotPresent
+        command:
+        - celery
+        - -A
+        - app.agents.worker
+        - flower
+        - --port=5555
+        - --broker=redis://redis:6379/0
+        ports:
+        - containerPort: 5555
+          name: flower
+          protocol: TCP
+        env:
+        - name: CELERY_BROKER_URL
+          value: "redis://redis:6379/0"
+        - name: CELERY_RESULT_BACKEND
+          value: "redis://redis:6379/1"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 5555
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 5555
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: flower
+  namespace: typesafe
+  labels:
+    app: flower
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5555
+    targetPort: 5555
+    protocol: TCP
+    name: flower
+  selector:
+    app: flower
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: flower-ingress
+  namespace: typesafe
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    # Add authentication if needed
+    # nginx.ingress.kubernetes.io/auth-type: basic
+    # nginx.ingress.kubernetes.io/auth-secret: flower-basic-auth
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: flower.typesafe.example.com  # Change to your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: flower
+            port:
+              number: 5555
+  # Add TLS if needed
+  # tls:
+  # - hosts:
+  #   - flower.typesafe.example.com
+  #   secretName: flower-tls
+

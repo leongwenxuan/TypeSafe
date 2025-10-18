@@ -1,0 +1,62 @@
+[Unit]
+Description=TypeSafe Celery Worker
+Documentation=https://github.com/yourusername/typesafe
+After=network.target redis.service
+Requires=redis.service
+
+[Service]
+Type=forking
+User=typesafe
+Group=typesafe
+WorkingDirectory=/opt/typesafe/backend
+
+# Environment setup
+Environment="PATH=/opt/typesafe/backend/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=/opt/typesafe/backend"
+Environment="PYTHONUNBUFFERED=1"
+
+# Redis & Celery configuration
+Environment="REDIS_URL=redis://localhost:6379"
+Environment="CELERY_BROKER_URL=redis://localhost:6379/0"
+Environment="CELERY_RESULT_BACKEND=redis://localhost:6379/1"
+
+# API Keys (use EnvironmentFile for production secrets)
+EnvironmentFile=/opt/typesafe/backend/.env
+
+# Start Celery worker
+ExecStart=/opt/typesafe/backend/venv/bin/celery \
+  -A app.agents.worker worker \
+  --loglevel=info \
+  --concurrency=4 \
+  --detach \
+  --pidfile=/var/run/typesafe/celery-worker.pid \
+  --logfile=/var/log/typesafe/celery-worker.log \
+  --hostname=worker-$(hostname)@%%h
+
+# Graceful shutdown
+ExecStop=/opt/typesafe/backend/venv/bin/celery \
+  -A app.agents.worker control shutdown
+
+# Worker management
+ExecReload=/bin/kill -HUP $MAINPID
+
+# Process management
+PIDFile=/var/run/typesafe/celery-worker.pid
+Restart=on-failure
+RestartSec=10s
+TimeoutStopSec=300
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/log/typesafe /var/run/typesafe
+
+# Resource limits
+LimitNOFILE=65536
+TasksMax=4096
+
+[Install]
+WantedBy=multi-user.target
+

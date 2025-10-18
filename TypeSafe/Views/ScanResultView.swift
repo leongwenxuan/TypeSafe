@@ -32,7 +32,7 @@ struct ScanResultView: View {
     
     /// Risk level color based on the result
     private var riskColor: Color {
-        switch result.risk_level.lowercased() {
+        switch result.risk_level?.lowercased() ?? "unknown" {
         case "high":
             return .red
         case "medium":
@@ -46,7 +46,7 @@ struct ScanResultView: View {
     
     /// Risk level icon based on the result
     private var riskIcon: String {
-        switch result.risk_level.lowercased() {
+        switch result.risk_level?.lowercased() ?? "unknown" {
         case "high":
             return "exclamationmark.triangle.fill"
         case "medium":
@@ -60,7 +60,7 @@ struct ScanResultView: View {
     
     /// Risk level title
     private var riskTitle: String {
-        switch result.risk_level.lowercased() {
+        switch result.risk_level?.lowercased() ?? "unknown" {
         case "high":
             return "High Risk Detected"
         case "medium":
@@ -100,7 +100,7 @@ struct ScanResultView: View {
                     Image(systemName: riskIcon)
                         .font(.system(size: 60))
                         .foregroundColor(riskColor)
-                        .accessibilityLabel("Risk level: \(result.risk_level)")
+                        .accessibilityLabel("Risk level: \(result.risk_level ?? "unknown")")
                     
                     Text(riskTitle)
                         .font(.title2)
@@ -117,7 +117,7 @@ struct ScanResultView: View {
                             .font(.headline)
                             .foregroundColor(.primary)
                         
-                        Text(result.explanation)
+                        Text(result.explanation ?? "Analysis completed")
                             .font(.body)
                             .foregroundColor(.secondary)
                             .padding()
@@ -134,19 +134,19 @@ struct ScanResultView: View {
                         VStack(spacing: 8) {
                             DetailRow(
                                 label: "Risk Level",
-                                value: result.risk_level.capitalized,
+                                value: (result.risk_level ?? "unknown").capitalized,
                                 color: riskColor
                             )
                             
                             DetailRow(
                                 label: "Confidence",
-                                value: "\(Int(result.confidence * 100))%",
+                                value: "\(Int((result.confidence ?? 0) * 100))%",
                                 color: .primary
                             )
                             
                             DetailRow(
                                 label: "Category",
-                                value: result.category.replacingOccurrences(of: "_", with: " ").capitalized,
+                                value: (result.category ?? "unknown").replacingOccurrences(of: "_", with: " ").capitalized,
                                 color: .primary
                             )
                             
@@ -261,11 +261,16 @@ private struct DetailRow: View {
     NavigationView {
         ScanResultView(
             result: ScanImageResponse(
+                type: "simple",
                 risk_level: "high",
                 confidence: 0.93,
                 category: "otp_phishing",
                 explanation: "This message is requesting an OTP (One-Time Password), which is a common phishing tactic used by scammers to gain access to your accounts.",
-                ts: "2025-01-18T10:30:00Z"
+                ts: "2025-01-18T10:30:00Z",
+                task_id: nil,
+                ws_url: nil,
+                estimated_time: nil,
+                entities_found: nil
             ),
             analyzedText: "Please send me your OTP code for verification. Reply with the 6-digit code you received.",
             onScanAnother: {
@@ -285,11 +290,16 @@ private struct DetailRow: View {
     NavigationView {
         ScanResultView(
             result: ScanImageResponse(
+                type: "simple",
                 risk_level: "low",
                 confidence: 0.95,
                 category: "safe",
                 explanation: "This appears to be a normal, legitimate message with no signs of scam or phishing attempts.",
-                ts: "2025-01-18T10:30:00Z"
+                ts: "2025-01-18T10:30:00Z",
+                task_id: nil,
+                ws_url: nil,
+                estimated_time: nil,
+                entities_found: nil
             ),
             analyzedText: "Your order has been confirmed. Thank you for your purchase! You will receive a tracking number via email once your item ships.",
             onScanAnother: {
@@ -309,11 +319,16 @@ private struct DetailRow: View {
     NavigationView {
         ScanResultView(
             result: ScanImageResponse(
+                type: "simple",
                 risk_level: "medium",
                 confidence: 0.78,
                 category: "payment_scam",
                 explanation: "This message contains suspicious payment-related content that could be a scam attempt. Exercise caution.",
-                ts: "2025-01-18T10:30:00Z"
+                ts: "2025-01-18T10:30:00Z",
+                task_id: nil,
+                ws_url: nil,
+                estimated_time: nil,
+                entities_found: nil
             ),
             analyzedText: "Urgent: Your account will be suspended unless you update your payment information immediately. Click here to verify your details.",
             onScanAnother: {

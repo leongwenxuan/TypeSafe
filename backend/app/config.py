@@ -39,10 +39,68 @@ class Settings(BaseSettings):
     supabase_key: str = Field(default="", alias="SUPABASE_KEY")
     backend_api_key: str = Field(default="", alias="BACKEND_API_KEY")
     
+    # MCP Agent Tool API Keys
+    exa_api_key: str = Field(
+        default="",
+        alias="EXA_API_KEY",
+        description="Exa API key for web search (Story 8.4)"
+    )
+    
     # CORS settings
     cors_origins: List[str] = Field(
         default=["*"],
         description="Allowed CORS origins"
+    )
+    
+    # Redis & Celery settings
+    redis_url: str = Field(
+        default="redis://localhost:6379",
+        alias="REDIS_URL",
+        description="Redis server URL"
+    )
+    celery_broker_url: str = Field(
+        default="redis://localhost:6379/0",
+        alias="CELERY_BROKER_URL",
+        description="Celery broker URL (Redis database 0)"
+    )
+    celery_result_backend: str = Field(
+        default="redis://localhost:6379/1",
+        alias="CELERY_RESULT_BACKEND",
+        description="Celery result backend URL (Redis database 1)"
+    )
+    
+    # Domain Reputation Tool API Keys (Story 8.5)
+    virustotal_api_key: str = Field(
+        default="",
+        alias="VIRUSTOTAL_API_KEY",
+        description="VirusTotal API key for domain scanning (optional)"
+    )
+    safe_browsing_api_key: str = Field(
+        default="",
+        alias="SAFE_BROWSING_API_KEY",
+        description="Google Safe Browsing API key (optional)"
+    )
+    
+    # MCP Agent settings
+    enable_mcp_agent: bool = Field(
+        default=True,
+        alias="ENABLE_MCP_AGENT",
+        description="Enable MCP agent for complex scans (Story 8.10)"
+    )
+    exa_cache_ttl: int = Field(
+        default=86400,
+        alias="EXA_CACHE_TTL",
+        description="Exa search cache TTL in seconds (default 24 hours)"
+    )
+    exa_max_results: int = Field(
+        default=10,
+        alias="EXA_MAX_RESULTS",
+        description="Maximum number of Exa search results per query"
+    )
+    exa_daily_budget: float = Field(
+        default=10.0,
+        alias="EXA_DAILY_BUDGET",
+        description="Daily budget limit for Exa API in USD"
     )
     
     def validate_required_keys(self) -> None:

@@ -1,0 +1,44 @@
+[Unit]
+Description=TypeSafe Flower (Celery Monitoring)
+Documentation=https://flower.readthedocs.io/
+After=network.target redis.service typesafe-celery.service
+Requires=redis.service
+
+[Service]
+Type=simple
+User=typesafe
+Group=typesafe
+WorkingDirectory=/opt/typesafe/backend
+
+# Environment setup
+Environment="PATH=/opt/typesafe/backend/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=/opt/typesafe/backend"
+
+# Redis & Celery configuration
+Environment="CELERY_BROKER_URL=redis://localhost:6379/0"
+Environment="CELERY_RESULT_BACKEND=redis://localhost:6379/1"
+
+# Start Flower
+ExecStart=/opt/typesafe/backend/venv/bin/celery \
+  -A app.agents.worker flower \
+  --port=5555 \
+  --broker=redis://localhost:6379/0 \
+  --basic_auth=admin:changeme \
+  --url_prefix=flower
+
+# Process management
+Restart=on-failure
+RestartSec=10s
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+# Resource limits
+LimitNOFILE=4096
+
+[Install]
+WantedBy=multi-user.target
+

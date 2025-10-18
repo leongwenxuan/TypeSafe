@@ -77,8 +77,8 @@ class APIService {
         text: String,
         completion: @escaping (Result<AnalyzeTextResponse, Error>) -> Void
     ) {
-        // Use fixed session ID for now (to avoid database foreign key issues)
-        let sessionID = "550e8400-e29b-41d4-a716-446655440000"
+        // Generate unique session ID for each request
+        let sessionID = UUID().uuidString
         
         // Get app bundle ID (for MVP, use "unknown")
         let appBundle = "unknown"  // TODO: Implement actual detection in future story

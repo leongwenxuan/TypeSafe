@@ -73,6 +73,17 @@ class KeyboardViewController: UIInputViewController {
     // Direct API service for keyboard (Story 5.4 - Full Independence)
     private let keyboardAPIService = KeyboardAPIService()
     
+    // WebSocket manager for agent progress
+    private var webSocketManager: KeyboardWebSocketManager?
+    
+    // MARK: - Lifecycle
+    
+    deinit {
+        print("🟡 KeyboardViewController: Cleaning up WebSocket on deinit")
+        webSocketManager?.disconnect()
+        webSocketManager = nil
+    }
+    
     // MARK: - Full Access Detection (Story 2.8)
     private var _cachedFullAccessStatus: Bool?
     private var hasFullAccessPermission: Bool {
@@ -155,6 +166,15 @@ class KeyboardViewController: UIInputViewController {
         // Performance optimization: Clear caches on memory warning (Story 2.9)
         clearPerformanceCaches()
         print("KeyboardViewController: Memory warning - cleared performance caches")
+        
+        // Immediately clean up WebSocket to free memory
+        webSocketManager?.disconnect()
+        webSocketManager = nil
+        
+        // Dismiss any banners
+        dismissBanner(animated: false)
+        
+        print("🟢 KeyboardViewController: Emergency cleanup completed")
     }
     
     override func textDidChange(_ textInput: UITextInput?) {
@@ -203,6 +223,9 @@ class KeyboardViewController: UIInputViewController {
         
         print("KeyboardViewController: keyboardView setup completed")
         
+        // Add top toolbar with action buttons
+        setupTopToolbar()
+        
         // Story 2.8: Show privacy message if Full Access is disabled
         setupPrivacyMessage()
         
@@ -210,6 +233,145 @@ class KeyboardViewController: UIInputViewController {
         print("KeyboardViewController: layout creation completed")
         updateAppearance()
         print("KeyboardViewController: appearance update completed")
+    }
+    
+    /// Setup top toolbar with Settings and Scan Now buttons
+    private func setupTopToolbar() {
+        // Toolbar container
+        let toolbar = UIView()
+        toolbar.backgroundColor = .clear
+        toolbar.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(toolbar)
+        
+        // Scan Now button (left)
+        let scanButton = UIButton(type: .system)
+        scanButton.setTitle("📸 Scan", for: .normal)
+        scanButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .medium)
+        scanButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.2)
+        scanButton.setTitleColor(.systemBlue, for: .normal)
+        scanButton.layer.cornerRadius = 6
+        scanButton.translatesAutoresizingMaskIntoConstraints = false
+        scanButton.addTarget(self, action: #selector(scanNowTapped), for: .touchUpInside)
+        
+        // Settings button (right)
+        let settingsButton = UIButton(type: .system)
+        settingsButton.setTitle("⚙️", for: .normal)
+        settingsButton.titleLabel?.font = .systemFont(ofSize: 18)
+        settingsButton.backgroundColor = UIColor.systemGray.withAlphaComponent(0.2)
+        settingsButton.layer.cornerRadius = 6
+        settingsButton.translatesAutoresizingMaskIntoConstraints = false
+        settingsButton.addTarget(self, action: #selector(settingsTapped), for: .touchUpInside)
+        
+        toolbar.addSubview(scanButton)
+        toolbar.addSubview(settingsButton)
+        
+        NSLayoutConstraint.activate([
+            // Toolbar at top
+            toolbar.topAnchor.constraint(equalTo: view.topAnchor, constant: 4),
+            toolbar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            toolbar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            toolbar.heightAnchor.constraint(equalToConstant: 32),
+            
+            // Scan button on left
+            scanButton.leadingAnchor.constraint(equalTo: toolbar.leadingAnchor, constant: 8),
+            scanButton.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
+            scanButton.widthAnchor.constraint(equalToConstant: 80),
+            scanButton.heightAnchor.constraint(equalToConstant: 28),
+            
+            // Settings button on right
+            settingsButton.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor, constant: -8),
+            settingsButton.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
+            settingsButton.widthAnchor.constraint(equalToConstant: 36),
+            settingsButton.heightAnchor.constraint(equalToConstant: 28)
+        ])
+    }
+    
+    @objc private func scanNowTapped() {
+        print("🟢 Scan Now tapped")
+        
+        // Haptic feedback
+        let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
+        feedbackGenerator.impactOccurred()
+        
+        // Show helpful banner prompting user to take screenshot
+        showScanInstructionBanner()
+    }
+    
+    /// Shows banner instructing user to take a screenshot
+    private func showScanInstructionBanner() {
+        dismissBanner(animated: false)
+        
+        let banner = UIView()
+        banner.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.95)
+        banner.layer.cornerRadius = 8
+        banner.translatesAutoresizingMaskIntoConstraints = false
+        
+        let label = UILabel()
+        label.text = "📸 Take a screenshot to scan!\nPress Power + Volume Up"
+        label.textColor = .white
+        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.numberOfLines = 2
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        
+        banner.addSubview(label)
+        view.addSubview(banner)
+        
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: banner.leadingAnchor, constant: 12),
+            label.trailingAnchor.constraint(equalTo: banner.trailingAnchor, constant: -12),
+            label.topAnchor.constraint(equalTo: banner.topAnchor, constant: 8),
+            label.bottomAnchor.constraint(equalTo: banner.bottomAnchor, constant: -8),
+            
+            banner.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),
+            banner.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
+            banner.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8)
+        ])
+        
+        currentBanner = banner
+        
+        // Animate in
+        banner.alpha = 0
+        UIView.animate(withDuration: 0.3) {
+            banner.alpha = 1.0
+        }
+        
+        // Auto-dismiss after 3 seconds
+        startBannerAutoDismissTimer(duration: 3.0)
+    }
+    
+    @objc private func settingsTapped() {
+        print("🟢 Settings tapped - opening companion app")
+        
+        // Haptic feedback
+        let feedbackGenerator = UIImpactFeedbackGenerator(style: .light)
+        feedbackGenerator.impactOccurred()
+        
+        // Open companion app (TypeSafe URL scheme)
+        if let url = URL(string: "typesafe://settings") {
+            var responder: UIResponder? = self
+            while let r = responder {
+                if let application = r as? UIApplication {
+                    application.open(url, options: [:], completionHandler: nil)
+                    return
+                }
+                responder = r.next
+            }
+        }
+        
+        print("🔴 Failed to open companion app")
+    }
+    
+    /// Handle manual screenshot scan trigger
+    private func handleScreenshotScanManually() {
+        guard hasFullAccessPermission else {
+            showErrorBanner(message: "Full Access required for scanning")
+            return
+        }
+        
+        print("🟢 Manual scan triggered - processing latest screenshot")
+        // Use existing screenshot detection handler
+        handleScreenshotDetectedInKeyboard()
     }
     
     private func createKeyboardLayout() {
@@ -1584,12 +1746,21 @@ class KeyboardViewController: UIInputViewController {
                     switch result {
                     case .success(let response):
                         print("🟢 KeyboardViewController: API SUCCESS!")
-                        print("   Risk: \(response.riskLevel)")
-                        print("   Confidence: \(response.confidence)")
-                        print("   Category: \(response.category)")
+                        print("   Response type: \(response.type)")
                         
-                        // Show result banner directly!
-                        self.showScamResultBanner(response: response)
+                        // Check if this is an agent response or simple response
+                        if response.isAgentResponse {
+                            print("   Agent response - task_id: \(response.taskId ?? "none")")
+                            print("   WebSocket URL: \(response.wsUrl ?? "none")")
+                            
+                            // Handle agent response with WebSocket
+                            self.handleAgentResponse(response: response)
+                        } else {
+                            print("   Simple response - risk: \(response.riskLevel ?? "unknown")")
+                            
+                            // Show result banner directly!
+                            self.showScamResultBanner(response: response)
+                        }
                         
                     case .failure(let error):
                         print("🔴 KeyboardViewController: API FAILED - \(error.localizedDescription)")
@@ -1601,9 +1772,91 @@ class KeyboardViewController: UIInputViewController {
         }
     }
     
+    /// Handles agent response by connecting to WebSocket for progress updates
+    private func handleAgentResponse(response: KeyboardAPIService.ScanResponse) {
+        guard let wsUrl = response.wsUrl, let taskId = response.taskId else {
+            print("🔴 KeyboardViewController: Missing WebSocket URL or task ID")
+            showErrorBanner(message: "Unable to connect to analysis service")
+            return
+        }
+        
+        print("🟡 KeyboardViewController: Connecting to agent WebSocket...")
+        
+        // Show analyzing banner
+        showAnalyzingBanner(estimatedTime: response.estimatedTime ?? "5-30 seconds")
+        
+        // Create and connect WebSocket manager
+        webSocketManager = KeyboardWebSocketManager(wsUrl: wsUrl, taskId: taskId)
+        webSocketManager?.connect(
+            onProgress: { [weak self] progress in
+                print("🟡 Agent progress: \(progress.progress)% - \(progress.message)")
+                // Update analyzing banner with progress
+                self?.updateAnalyzingBanner(progress: progress.progress, message: progress.message)
+            },
+            onCompletion: { [weak self] result in
+                print("🟢 KeyboardViewController: ===== COMPLETION CALLBACK FIRED =====")
+                guard let self = self else {
+                    print("🔴 KeyboardViewController: Self is nil in completion callback!")
+                    return
+                }
+                print("🟢 KeyboardViewController: Agent completion callback called!")
+                print("   Risk: \(result.riskLevel)")
+                print("   Confidence: \(result.confidence)")
+                print("   Category: \(result.category)")
+                print("   Explanation: \(result.explanation)")
+                
+                // DON'T clean up WebSocket yet - it will clean itself up after disconnect
+                print("🟢 KeyboardViewController: Keeping WebSocket alive until banner shows")
+                
+                // Convert to ScanResponse format and show result IMMEDIATELY (no delay)
+                let scanResponse = KeyboardAPIService.ScanResponse(
+                    type: "simple",
+                    riskLevel: result.riskLevel,
+                    confidence: result.confidence,
+                    category: result.category,
+                    explanation: result.explanation,
+                    taskId: nil,
+                    wsUrl: nil,
+                    estimatedTime: nil,
+                    entitiesFound: nil
+                )
+                
+                print("🟡 KeyboardViewController: Calling showScamResultBanner NOW (no delay)...")
+                self.showScamResultBanner(response: scanResponse)
+                print("🟢 KeyboardViewController: showScamResultBanner completed!")
+                
+                // NOW clean up WebSocket after banner is shown
+                self.webSocketManager?.disconnect()
+                self.webSocketManager = nil
+                print("🟢 KeyboardViewController: WebSocket cleaned up")
+                print("🟢 KeyboardViewController: ===== COMPLETION CALLBACK DONE =====")
+            },
+            onError: { [weak self] error in
+                print("🔴 Agent error: \(error.localizedDescription)")
+                
+                // MUST be on main thread for UI updates
+                DispatchQueue.main.async { [weak self] in
+                    guard let self = self else { return }
+                    
+                    self.showErrorBanner(message: "Analysis failed - please try again")
+                    
+                    // Clean up WebSocket after error banner shown
+                    self.webSocketManager?.disconnect()
+                    self.webSocketManager = nil
+                }
+            }
+        )
+    }
+    
+    /// Current analysis response (stored for tap to view details)
+    private var currentAnalysisResponse: KeyboardAPIService.ScanResponse?
+    
     /// Shows a banner with the scam analysis result
     private func showScamResultBanner(response: KeyboardAPIService.ScanResponse) {
         print("🟢 KeyboardViewController: Showing result banner")
+        
+        // Store response for tap-to-view details
+        currentAnalysisResponse = response
         
         // Dismiss any existing banner
         dismissBanner(animated: false)
@@ -1612,8 +1865,9 @@ class KeyboardViewController: UIInputViewController {
         let backgroundColor: UIColor
         let textColor: UIColor
         let icon: String
+        let riskLevel = response.riskLevel ?? "unknown"
         
-        switch response.riskLevel.lowercased() {
+        switch riskLevel.lowercased() {
         case "high":
             backgroundColor = UIColor.systemRed.withAlphaComponent(0.95)
             textColor = .white
@@ -1637,6 +1891,17 @@ class KeyboardViewController: UIInputViewController {
         banner.backgroundColor = backgroundColor
         banner.layer.cornerRadius = 8
         banner.translatesAutoresizingMaskIntoConstraints = false
+        banner.isUserInteractionEnabled = true
+        
+        // Add tap gesture to view details
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(bannerTappedToViewDetails))
+        tapGesture.cancelsTouchesInView = false  // Don't interfere with other gestures
+        banner.addGestureRecognizer(tapGesture)
+        print("🟡 Tap gesture added to banner - action: bannerTappedToViewDetails")
+        
+        // Add subtle indicator that banner is tappable
+        banner.layer.borderWidth = 1
+        banner.layer.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
         
         // Icon label
         let iconLabel = UILabel()
@@ -1646,8 +1911,10 @@ class KeyboardViewController: UIInputViewController {
         
         // Message label
         let messageLabel = UILabel()
-        let confidencePercent = Int(response.confidence * 100)
-        messageLabel.text = "\(response.category.uppercased()): \(response.riskLevel.uppercased()) RISK (\(confidencePercent)%)"
+        let confidencePercent = Int((response.confidence ?? 0.0) * 100)
+        let category = (response.category ?? "unknown").uppercased()
+        let risk = riskLevel.uppercased()
+        messageLabel.text = "\(category): \(risk) RISK (\(confidencePercent)%)\nTap for details"
         messageLabel.textColor = textColor
         messageLabel.font = .systemFont(ofSize: 14, weight: .semibold)
         messageLabel.numberOfLines = 2
@@ -1691,13 +1958,15 @@ class KeyboardViewController: UIInputViewController {
         ])
         
         currentBanner = banner
-        keyboardView.addSubview(banner)
         
-        // Position banner ABOVE the keyboard (negative offset)
+        // Add banner to view (same as analyzing banner)
+        view.addSubview(banner)
+        
+        // Position banner at TOP with more margin
         NSLayoutConstraint.activate([
-            banner.leadingAnchor.constraint(equalTo: keyboardView.leadingAnchor, constant: 8),
-            banner.trailingAnchor.constraint(equalTo: keyboardView.trailingAnchor, constant: -8),
-            banner.bottomAnchor.constraint(equalTo: keyboardView.topAnchor, constant: -8) // Above keyboard!
+            banner.topAnchor.constraint(equalTo: view.topAnchor, constant: 8),  // More margin
+            banner.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
+            banner.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8)
         ])
         
         // Animate in
@@ -1708,14 +1977,14 @@ class KeyboardViewController: UIInputViewController {
             banner.transform = CGAffineTransform.identity
         }
         
-        // Auto-dismiss after 10 seconds
-        startBannerAutoDismissTimer(duration: 10.0)
+        // Auto-dismiss after 20 seconds (longer for result reading)
+        startBannerAutoDismissTimer(duration: 20.0)
         
         // Haptic feedback
         let feedbackGenerator = UINotificationFeedbackGenerator()
         feedbackGenerator.prepare()
         
-        switch response.riskLevel.lowercased() {
+        switch riskLevel.lowercased() {
         case "high":
             feedbackGenerator.notificationOccurred(.warning)
         case "medium":
@@ -1732,7 +2001,267 @@ class KeyboardViewController: UIInputViewController {
         dismissBanner(animated: true)
     }
     
+    /// Banner tapped to view analysis details
+    @objc private func bannerTappedToViewDetails() {
+        print("🟢🟢🟢 BANNER TAP DETECTED!")
+        
+        guard let response = currentAnalysisResponse else {
+            print("🔴 No analysis response stored")
+            return
+        }
+        
+        print("🟢 Banner tapped - showing analysis details")
+        print("   Risk: \(response.riskLevel ?? "nil")")
+        print("   Explanation: \(response.explanation ?? "nil")")
+        
+        // Haptic feedback
+        let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
+        feedbackGenerator.impactOccurred()
+        
+        // Show detailed explanation
+        showAnalysisDetails(response: response)
+    }
+    
+    /// Shows detailed analysis explanation in a custom modal (can't use UIAlertController in keyboard extensions)
+    private func showAnalysisDetails(response: KeyboardAPIService.ScanResponse) {
+        // Dismiss banner when showing modal
+        dismissBanner(animated: true)
+        
+        let riskLevel = (response.riskLevel ?? "unknown").uppercased()
+        let confidencePercent = Int((response.confidence ?? 0.0) * 100)
+        let category = (response.category ?? "unknown").uppercased()
+        let explanation = response.explanation ?? "No detailed explanation available."
+        
+        // Determine risk icon and color
+        let icon: String
+        let titleColor: UIColor
+        switch (response.riskLevel ?? "unknown").lowercased() {
+        case "high":
+            icon = "⚠️"
+            titleColor = .systemRed
+        case "medium":
+            icon = "⚠️"
+            titleColor = .systemOrange
+        case "low":
+            icon = "✅"
+            titleColor = .systemGreen
+        default:
+            icon = "ℹ️"
+            titleColor = .systemGray
+        }
+        
+        // Create overlay background
+        let overlay = UIView()
+        overlay.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+        overlay.translatesAutoresizingMaskIntoConstraints = false
+        overlay.tag = 8888 // Tag for removal
+        
+        // Create modal card
+        let modalCard = UIView()
+        modalCard.backgroundColor = .white
+        modalCard.layer.cornerRadius = 12
+        modalCard.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Title label
+        let titleLabel = UILabel()
+        titleLabel.text = "\(icon) \(riskLevel) RISK"
+        titleLabel.textColor = titleColor
+        titleLabel.font = .systemFont(ofSize: 20, weight: .bold)
+        titleLabel.textAlignment = .center
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Category label
+        let categoryLabel = UILabel()
+        categoryLabel.text = category
+        categoryLabel.textColor = .darkGray
+        categoryLabel.font = .systemFont(ofSize: 14, weight: .medium)
+        categoryLabel.textAlignment = .center
+        categoryLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Confidence label
+        let confidenceLabel = UILabel()
+        confidenceLabel.text = "📊 Confidence: \(confidencePercent)%"
+        confidenceLabel.textColor = .darkGray
+        confidenceLabel.font = .systemFont(ofSize: 14, weight: .regular)
+        confidenceLabel.textAlignment = .center
+        confidenceLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Divider
+        let divider = UIView()
+        divider.backgroundColor = .lightGray.withAlphaComponent(0.3)
+        divider.translatesAutoresizingMaskIntoConstraints = false
+        
+        // Explanation scroll view
+        let scrollView = UIScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.showsVerticalScrollIndicator = true
+        
+        let explanationLabel = UILabel()
+        // Keep explanation short and sweet - truncate if too long
+        let maxLength = 200
+        let shortExplanation = explanation.count > maxLength 
+            ? String(explanation.prefix(maxLength)) + "..." 
+            : explanation
+        explanationLabel.text = shortExplanation
+        explanationLabel.textColor = .darkGray
+        explanationLabel.font = .systemFont(ofSize: 14, weight: .regular)
+        explanationLabel.numberOfLines = 0
+        explanationLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        scrollView.addSubview(explanationLabel)
+        
+        // Close button (prominent and easy to tap)
+        let closeButton = UIButton(type: .system)
+        closeButton.setTitle("✕ Close", for: .normal)
+        closeButton.titleLabel?.font = .systemFont(ofSize: 18, weight: .bold)
+        closeButton.backgroundColor = .systemBlue
+        closeButton.setTitleColor(.white, for: .normal)
+        closeButton.layer.cornerRadius = 10
+        closeButton.translatesAutoresizingMaskIntoConstraints = false
+        closeButton.addTarget(self, action: #selector(closeAnalysisDetailsTapped), for: .touchUpInside)
+        
+        // Add subviews
+        modalCard.addSubview(titleLabel)
+        modalCard.addSubview(categoryLabel)
+        modalCard.addSubview(confidenceLabel)
+        modalCard.addSubview(divider)
+        modalCard.addSubview(scrollView)
+        modalCard.addSubview(closeButton)
+        
+        overlay.addSubview(modalCard)
+        keyboardView.addSubview(overlay)
+        
+        // Layout constraints
+        NSLayoutConstraint.activate([
+            // Overlay fills keyboard
+            overlay.topAnchor.constraint(equalTo: keyboardView.topAnchor),
+            overlay.leadingAnchor.constraint(equalTo: keyboardView.leadingAnchor),
+            overlay.trailingAnchor.constraint(equalTo: keyboardView.trailingAnchor),
+            overlay.bottomAnchor.constraint(equalTo: keyboardView.bottomAnchor),
+            
+            // Modal card positioned high (more negative margin)
+            modalCard.centerXAnchor.constraint(equalTo: overlay.centerXAnchor),
+            modalCard.topAnchor.constraint(equalTo: overlay.topAnchor, constant: -40),  // Push higher
+            modalCard.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 16),
+            modalCard.trailingAnchor.constraint(equalTo: overlay.trailingAnchor, constant: -16),
+            modalCard.heightAnchor.constraint(equalToConstant: 200),
+            
+            // Title (minimal top margin)
+            titleLabel.topAnchor.constraint(equalTo: modalCard.topAnchor, constant: 8),
+            titleLabel.leadingAnchor.constraint(equalTo: modalCard.leadingAnchor, constant: 12),
+            titleLabel.trailingAnchor.constraint(equalTo: modalCard.trailingAnchor, constant: -12),
+            
+            // Category
+            categoryLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 2),
+            categoryLabel.leadingAnchor.constraint(equalTo: modalCard.leadingAnchor, constant: 12),
+            categoryLabel.trailingAnchor.constraint(equalTo: modalCard.trailingAnchor, constant: -12),
+            
+            // Confidence
+            confidenceLabel.topAnchor.constraint(equalTo: categoryLabel.bottomAnchor, constant: 4),
+            confidenceLabel.leadingAnchor.constraint(equalTo: modalCard.leadingAnchor, constant: 12),
+            confidenceLabel.trailingAnchor.constraint(equalTo: modalCard.trailingAnchor, constant: -12),
+            
+            // Divider
+            divider.topAnchor.constraint(equalTo: confidenceLabel.bottomAnchor, constant: 8),
+            divider.leadingAnchor.constraint(equalTo: modalCard.leadingAnchor, constant: 12),
+            divider.trailingAnchor.constraint(equalTo: modalCard.trailingAnchor, constant: -12),
+            divider.heightAnchor.constraint(equalToConstant: 1),
+            
+            // Scroll view with explanation (compact)
+            scrollView.topAnchor.constraint(equalTo: divider.bottomAnchor, constant: 8),
+            scrollView.leadingAnchor.constraint(equalTo: modalCard.leadingAnchor, constant: 12),
+            scrollView.trailingAnchor.constraint(equalTo: modalCard.trailingAnchor, constant: -12),
+            scrollView.bottomAnchor.constraint(equalTo: closeButton.topAnchor, constant: -8),
+            
+            // Explanation label in scroll view
+            explanationLabel.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            explanationLabel.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            explanationLabel.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            explanationLabel.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
+            explanationLabel.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+            
+            // Close button (normal size)
+            closeButton.leadingAnchor.constraint(equalTo: modalCard.leadingAnchor, constant: 12),
+            closeButton.bottomAnchor.constraint(equalTo: modalCard.bottomAnchor, constant: -12),
+            closeButton.trailingAnchor.constraint(equalTo: modalCard.trailingAnchor, constant: -12),
+            closeButton.heightAnchor.constraint(equalToConstant: 40)
+        ])
+        
+        // Animate in
+        overlay.alpha = 0
+        modalCard.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+        UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseOut) {
+            overlay.alpha = 1.0
+            modalCard.transform = .identity
+        }
+        
+        // Add tap on overlay to dismiss
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(closeAnalysisDetailsTapped))
+        overlay.addGestureRecognizer(tapGesture)
+    }
+    
+    @objc private func closeAnalysisDetailsTapped() {
+        // Find and remove overlay
+        if let overlay = keyboardView.viewWithTag(8888) {
+            UIView.animate(withDuration: 0.2) {
+                overlay.alpha = 0
+            } completion: { _ in
+                overlay.removeFromSuperview()
+            }
+        }
+    }
+    
     /// Shows an error banner
+    /// Shows analyzing banner with progress
+    private func showAnalyzingBanner(estimatedTime: String) {
+        print("🟡 KeyboardViewController: Showing analyzing banner")
+        
+        dismissBanner(animated: false)
+        
+        let banner = UIView()
+        banner.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.95)
+        banner.layer.cornerRadius = 8
+        banner.tag = 9999 // Tag for updating
+        
+        let label = UILabel()
+        label.text = "🔍 Analyzing... (\(estimatedTime))"
+        label.textColor = .white
+        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.numberOfLines = 2
+        label.textAlignment = .center
+        label.tag = 1000 // Tag for updating text
+        
+        banner.addSubview(label)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: banner.leadingAnchor, constant: 12),
+            label.trailingAnchor.constraint(equalTo: banner.trailingAnchor, constant: -12),
+            label.topAnchor.constraint(equalTo: banner.topAnchor, constant: 8),
+            label.bottomAnchor.constraint(equalTo: banner.bottomAnchor, constant: -8)
+        ])
+        
+        view.addSubview(banner)
+        banner.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            banner.topAnchor.constraint(equalTo: view.topAnchor, constant: 4),
+            banner.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 8),
+            banner.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -8),
+            banner.heightAnchor.constraint(greaterThanOrEqualToConstant: 40)
+        ])
+        
+        currentBanner = banner
+    }
+    
+    /// Updates analyzing banner with progress
+    private func updateAnalyzingBanner(progress: Int, message: String) {
+        guard let banner = currentBanner, banner.tag == 9999,
+              let label = banner.viewWithTag(1000) as? UILabel else {
+            return
+        }
+        
+        label.text = "🔍 \(progress)% - \(message)"
+    }
+    
     private func showErrorBanner(message: String) {
         print("🔴 KeyboardViewController: Showing error banner")
         

@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-worker
+  namespace: typesafe
+  labels:
+    app: celery-worker
+    component: worker
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: celery-worker
+  template:
+    metadata:
+      labels:
+        app: celery-worker
+        component: worker
+    spec:
+      containers:
+      - name: celery-worker
+        image: typesafe-backend:latest  # Update with your image
+        imagePullPolicy: IfNotPresent
+        command:
+        - celery
+        - -A
+        - app.agents.worker
+        - worker
+        - --loglevel=info
+        - --concurrency=4
+        - --hostname=worker-$(POD_NAME)@%h
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: CELERY_BROKER_URL
+          value: "redis://redis:6379/0"
+        - name: CELERY_RESULT_BACKEND
+          value: "redis://redis:6379/1"
+        - name: REDIS_URL
+          value: "redis://redis:6379"
+        - name: PYTHONUNBUFFERED
+          value: "1"
+        - name: ENVIRONMENT
+          value: "production"
+        # API Keys from secrets
+        - name: GROQ_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: typesafe-secrets
+              key: groq-api-key
+        - name: GEMINI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: typesafe-secrets
+              key: gemini-api-key
+        - name: SUPABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: typesafe-secrets
+              key: supabase-url
+        - name: SUPABASE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: typesafe-secrets
+              key: supabase-key
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - app.agents.worker
+            - inspect
+            - ping
+            - -d
+            - worker-$(POD_NAME)@$(HOSTNAME)
+          initialDelaySeconds: 60
+          periodSeconds: 60
+          timeoutSeconds: 10
+          failureThreshold: 3
+      restartPolicy: Always
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: celery-worker-hpa
+  namespace: typesafe
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: celery-worker
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+

@@ -49,6 +49,12 @@ struct MainTabView: View {
                 selectedTab = 0 // Navigate to scan tab
             }
         }
+        .onChange(of: deepLinkCoordinator.shouldNavigateToSettings) { shouldNavigate in
+            if shouldNavigate {
+                print("MainTabView: Deep link triggered - navigating to settings tab")
+                selectedTab = 2 // Navigate to settings tab
+            }
+        }
         .onAppear {
             // Configure tab bar appearance for consistent branding
             let appearance = UITabBarAppearance()

@@ -10,6 +10,9 @@ Run these migrations in order using the Supabase SQL Editor:
 2. **002_create_text_analyses.sql** - Creates the text_analyses table with foreign key to sessions
 3. **003_create_scan_results.sql** - Creates the scan_results table with foreign key to sessions
 4. **004_setup_retention.sql** - Creates the 7-day retention cleanup function
+5. **005_create_scam_phones.sql** - Creates the scam_phones table with example scam numbers
+6. **006_create_scam_reports.sql** - Creates the scam_reports table for MCP agent (Story 8.3)
+7. **007_create_agent_scan_results.sql** - Creates the agent_scan_results table for MCP agent (Story 8.7)
 
 ## Manual Steps After Running Migrations
 
@@ -40,6 +43,15 @@ WHERE table_schema = 'public';
 -- Check scan_results table structure
 \d scan_results
 
+-- Check scam_phones table structure
+\d scam_phones
+
+-- Check scam_reports table structure
+\d scam_reports
+
+-- Check agent_scan_results table structure
+\d agent_scan_results
+
 -- Verify cron job is scheduled
 SELECT * FROM cron.job;
 ```
@@ -63,6 +75,9 @@ If you need to rollback these migrations:
 
 ```sql
 -- Drop in reverse order
+DROP TABLE IF EXISTS agent_scan_results;
+DROP TABLE IF EXISTS scam_reports;
+DROP TABLE IF EXISTS scam_phones;
 DROP FUNCTION IF EXISTS cleanup_old_data();
 DROP TABLE IF EXISTS scan_results;
 DROP TABLE IF EXISTS text_analyses;

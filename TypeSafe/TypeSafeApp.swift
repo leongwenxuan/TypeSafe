@@ -65,6 +65,7 @@ private class ScreenshotNotificationManagerWrapper: ObservableObject {
 
 /// Deep link coordinator for handling URL schemes (Story 4.2, enhanced in Story 5.2)
 /// Manages navigation to scan view when keyboard triggers typesafe://scan or typesafe://scan?auto=true
+/// Also handles typesafe://settings to navigate to settings tab
 class DeepLinkCoordinator: ObservableObject {
     /// Published property to trigger navigation to scan tab
     @Published var shouldNavigateToScan: Bool = false
@@ -72,8 +73,11 @@ class DeepLinkCoordinator: ObservableObject {
     /// Published property to trigger automatic scanning (Story 5.2)
     @Published var shouldAutoScan: Bool = false
     
+    /// Published property to trigger navigation to settings tab
+    @Published var shouldNavigateToSettings: Bool = false
+    
     /// Handles incoming URL schemes
-    /// - Parameter url: The URL to handle (e.g., typesafe://scan or typesafe://scan?auto=true)
+    /// - Parameter url: The URL to handle (e.g., typesafe://scan, typesafe://scan?auto=true, typesafe://settings)
     func handleURL(_ url: URL) {
         print("DeepLinkCoordinator: Received URL: \(url.absoluteString)")
         
@@ -99,6 +103,15 @@ class DeepLinkCoordinator: ObservableObject {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 self.shouldNavigateToScan = false
                 self.shouldAutoScan = false
+            }
+            
+        case "settings":
+            print("DeepLinkCoordinator: Navigating to settings view")
+            shouldNavigateToSettings = true
+            
+            // Reset after a short delay to allow repeated triggers
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                self.shouldNavigateToSettings = false
             }
             
         default:

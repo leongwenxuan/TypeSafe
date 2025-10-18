@@ -30,6 +30,9 @@ struct ScanView: View {
     @State private var isAnalyzingBackend = false  // Story 5.3: Backend analysis in progress
     @State private var analysisResult: ScanImageResponse?  // Story 5.3: Backend analysis result
     @State private var showingResult = false  // Story 5.3: Show result view
+    @State private var showingAgentProgress = false  // Story 8.11: Show agent progress view
+    @State private var agentTaskId: String?  // Story 8.11: Agent task ID
+    @State private var agentWsUrl: String?  // Story 8.11: Agent WebSocket URL
     
     @StateObject private var ocrService = OCRService()
     @StateObject private var photosPermission = PhotosPermissionManager.shared
@@ -293,6 +296,19 @@ struct ScanView: View {
                     )
                 }
             }
+            .navigationDestination(isPresented: $showingAgentProgress) {
+                // Story 8.11: Navigate to agent progress view
+                if let taskId = agentTaskId, let wsUrl = agentWsUrl {
+                    AgentProgressView(
+                        taskId: taskId,
+                        wsUrl: wsUrl,
+                        onDismiss: {
+                            // Reset and go back to scan view
+                            resetToInitialState()
+                        }
+                    )
+                }
+            }
         }
     }
     
@@ -493,10 +509,14 @@ struct ScanView: View {
         isAnalyzingBackend = false
         analysisResult = nil
         showingResult = false
+        showingAgentProgress = false
+        agentTaskId = nil
+        agentWsUrl = nil
         extractedText = ""
     }
     
-    /// Story 5.3: Automatically submit OCR text to backend and navigate to results
+    /// Story 5.3 & 8.11: Automatically submit OCR text to backend and navigate to results
+    /// Enhanced in 8.11 to handle agent path responses with WebSocket progress
     /// - Parameters:
     ///   - ocrText: Extracted OCR text
     ///   - image: Original screenshot image
@@ -514,14 +534,44 @@ struct ScanView: View {
                 
                 switch result {
                 case .success(let response):
-                    print("ScanView: Backend analysis successful - Risk: \(response.risk_level)")
-                    
-                    // Save to history
-                    self.saveToHistory(result: response, ocrText: ocrText)
-                    
-                    // Navigate to results
-                    self.analysisResult = response
-                    self.showingResult = true
+                    // Story 8.11: Check if this is an agent response
+                    if response.isAgentResponse {
+                        // Agent path - navigate to progress view
+                        print("ScanView: Agent path detected - Task ID: \(response.task_id ?? "none")")
+                        
+                        guard let taskId = response.task_id, let wsUrl = response.ws_url else {
+                            print("ScanView: Missing task_id or ws_url in agent response")
+                            self.errorMessage = "Invalid agent response. Please try again."
+                            self.showingError = true
+                            self.showingOCRPreview = true
+                            return
+                        }
+                        
+                        // Navigate to agent progress view
+                        self.agentTaskId = taskId
+                        self.agentWsUrl = wsUrl
+                        self.showingAgentProgress = true
+                        
+                    } else {
+                        // Fast path - navigate to simple results
+                        print("ScanView: Fast path - Risk: \(response.risk_level ?? "unknown")")
+                        
+                        // Ensure required fields are present
+                        guard let riskLevel = response.risk_level else {
+                            print("ScanView: Missing risk_level in fast path response")
+                            self.errorMessage = "Invalid response from server. Please try again."
+                            self.showingError = true
+                            self.showingOCRPreview = true
+                            return
+                        }
+                        
+                        // Save to history
+                        self.saveToHistory(result: response, ocrText: ocrText)
+                        
+                        // Navigate to results
+                        self.analysisResult = response
+                        self.showingResult = true
+                    }
                     
                 case .failure(let error):
                     print("ScanView: Backend analysis failed: \(error.localizedDescription)")
@@ -537,20 +587,35 @@ struct ScanView: View {
     
     /// Save scan result to history
     private func saveToHistory(result: ScanImageResponse, ocrText: String) {
+        // Only save simple/fast path responses - agent results are saved after completion
+        guard result.isSimpleResponse else {
+            print("ScanView: Skipping history save for agent response (will save after completion)")
+            return
+        }
+        
+        // Ensure required fields are present
+        guard let riskLevel = result.risk_level,
+              let confidence = result.confidence,
+              let category = result.category,
+              let explanation = result.explanation else {
+            print("ScanView: Missing required fields for history save")
+            return
+        }
+        
         let sessionId = UserDefaults.standard.string(forKey: "session_id") ?? UUID().uuidString
         
         HistoryManager.shared.saveToHistory(
             sessionId: sessionId,
-            riskLevel: result.risk_level,
-            confidence: result.confidence,
-            category: result.category,
-            explanation: result.explanation,
+            riskLevel: riskLevel,
+            confidence: confidence,
+            category: category,
+            explanation: explanation,
             ocrText: ocrText,
             thumbnailData: nil,
             isAutoScanned: isAutoScannedImage
         )
         
-        print("ScanView: Saved to history - \(result.category) (\(result.risk_level))")
+        print("ScanView: Saved to history - \(category) (\(riskLevel))")
     }
 }
 

@@ -16,7 +16,7 @@ class APIService: ObservableObject {
     // MARK: - Properties
     
     /// Backend base URL (configurable for dev/prod)
-    private let baseURL: String
+    let baseURL: String
     
     /// URLSession configured with 4s timeout as per architecture requirements
     private let session: URLSession
@@ -240,12 +240,23 @@ class APIService: ObservableObject {
             let response = try decoder.decode(ScanImageResponse.self, from: data)
             
             print("APIService: Received response")
-            print("  - Risk level: \(response.risk_level)")
-            print("  - Confidence: \(response.confidence)")
-            print("  - Category: \(response.category)")
+            print("  - Type: \(response.type)")
             
-            // Update shared storage for keyboard sync (Story 3.7)
-            updateSharedScanResult(response)
+            if response.isAgentResponse {
+                // Agent path response
+                print("  - Task ID: \(response.task_id ?? "none")")
+                print("  - WebSocket URL: \(response.ws_url ?? "none")")
+                print("  - Entities found: \(response.entities_found ?? 0)")
+            } else {
+                // Simple fast path response
+                print("  - Risk level: \(response.risk_level ?? "unknown")")
+                print("  - Confidence: \(response.confidence ?? 0)")
+                print("  - Category: \(response.category ?? "unknown")")
+                
+                // Update shared storage for keyboard sync (Story 3.7)
+                // Only for simple responses - agent responses don't have immediate results
+                updateSharedScanResult(response)
+            }
             
             DispatchQueue.main.async {
                 completion(.success(response))
@@ -261,11 +272,19 @@ class APIService: ObservableObject {
     /// Updates shared storage with scan result for keyboard sync
     /// - Parameter response: Scan result from backend
     private func updateSharedScanResult(_ response: ScanImageResponse) {
+        // Only update for simple responses with valid data
+        guard let riskLevel = response.risk_level,
+              let category = response.category,
+              let confidence = response.confidence else {
+            print("APIService: Skipping shared storage update - missing required fields")
+            return
+        }
+        
         // Create SharedScanResult with privacy-safe data
         let sharedResult = SharedScanResult(
-            riskLevel: response.risk_level,
-            category: formatCategoryForDisplay(response.category),
-            confidence: response.confidence
+            riskLevel: riskLevel,
+            category: formatCategoryForDisplay(category),
+            confidence: confidence
         )
         
         // Write to shared storage (non-blocking)
@@ -356,21 +375,49 @@ class PrivacyManager: ObservableObject {
 // MARK: - Response Models
 
 /// Response payload from POST /scan-image endpoint
+/// Can be either a simple (fast path) response or an agent response
 struct ScanImageResponse: Codable {
+    /// Response type: "simple" or "agent"
+    let type: String
+    
+    // Fast path fields (type == "simple")
     /// Risk classification: "low", "medium", or "high"
-    let risk_level: String
+    let risk_level: String?
     
     /// Confidence score from 0.0 to 1.0
-    let confidence: Double
+    let confidence: Double?
     
     /// Scam category: "otp_phishing", "payment_scam", "impersonation", or "unknown"
-    let category: String
+    let category: String?
     
     /// Human-friendly explanation (one-liner)
-    let explanation: String
+    let explanation: String?
     
     /// Optional ISO-8601 timestamp from backend
     let ts: String?
+    
+    // Agent path fields (type == "agent")
+    /// Agent task ID for progress tracking
+    let task_id: String?
+    
+    /// WebSocket URL for progress updates
+    let ws_url: String?
+    
+    /// Estimated processing time
+    let estimated_time: String?
+    
+    /// Number of entities found (for agent path)
+    let entities_found: Int?
+    
+    /// Whether this is an agent response
+    var isAgentResponse: Bool {
+        return type == "agent"
+    }
+    
+    /// Whether this is a simple fast path response
+    var isSimpleResponse: Bool {
+        return type == "simple"
+    }
 }
 
 // MARK: - API Errors

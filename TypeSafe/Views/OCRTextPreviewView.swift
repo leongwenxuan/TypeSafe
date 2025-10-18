@@ -50,6 +50,9 @@ struct OCRTextPreviewView: View {
     /// Whether to show result view
     @State private var showingResult: Bool = false
     
+    /// Whether to show agent progress view
+    @State private var showingAgentProgress: Bool = false
+    
     /// Callbacks for user actions
     let onRetryOCR: () -> Void
     let onCancel: () -> Void
@@ -262,6 +265,21 @@ struct OCRTextPreviewView: View {
                 )
             }
         }
+        .navigationDestination(isPresented: $showingAgentProgress) {
+            if let result = analysisResult,
+               let taskId = result.task_id,
+               let wsUrl = result.ws_url {
+                AgentProgressView(
+                    taskId: taskId,
+                    wsUrl: wsUrl,
+                    onDismiss: {
+                        // Reset state and go back
+                        resetState()
+                        onCancel()
+                    }
+                )
+            }
+        }
     }
     
     // MARK: - Private Methods
@@ -289,10 +307,18 @@ struct OCRTextPreviewView: View {
                 switch result {
                 case .success(let response):
                     print("OCRTextPreviewView: Analysis successful")
-                    print("  - Risk level: \(response.risk_level)")
+                    print("  - Response type: \(response.type)")
                     
                     analysisResult = response
-                    showingResult = true
+                    
+                    // Check if this is an agent response or simple response
+                    if response.isAgentResponse {
+                        print("  - Agent response: task_id=\(response.task_id ?? "none")")
+                        showingAgentProgress = true
+                    } else {
+                        print("  - Simple response: risk_level=\(response.risk_level ?? "unknown")")
+                        showingResult = true
+                    }
                     
                 case .failure(let error):
                     print("OCRTextPreviewView: Analysis failed: \(error.localizedDescription)")
@@ -315,6 +341,7 @@ struct OCRTextPreviewView: View {
         analysisResult = nil
         showingErrorAlert = false
         showingResult = false
+        showingAgentProgress = false
     }
     
     /// Saves the analysis result to history
@@ -328,16 +355,16 @@ struct OCRTextPreviewView: View {
         // Save to history using HistoryManager (Story 5.2: Pass isAutoScanned flag)
         HistoryManager.shared.saveToHistory(
             sessionId: sessionId,
-            riskLevel: result.risk_level,
-            confidence: result.confidence,
-            category: result.category,
-            explanation: result.explanation,
+            riskLevel: result.risk_level ?? "unknown",
+            confidence: result.confidence ?? 0.0,
+            category: result.category ?? "unknown",
+            explanation: result.explanation ?? "Analysis completed",
             ocrText: analyzedText,
             thumbnailData: nil, // No thumbnail for now
             isAutoScanned: isAutoScanned
         )
         
-        print("Saved scan result to history: \(result.category) - \(result.risk_level) (auto-scanned: \(isAutoScanned))")
+        print("Saved scan result to history: \(result.category ?? "unknown") - \(result.risk_level ?? "unknown") (auto-scanned: \(isAutoScanned))")
     }
 }
 

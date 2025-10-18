@@ -38,16 +38,36 @@ class KeyboardAPIService {
     }
     
     struct ScanResponse: Codable {
-        let riskLevel: String
-        let confidence: Double
-        let category: String
-        let explanation: String
+        /// Response type: "simple" or "agent"
+        let type: String
+        
+        // Simple response fields
+        let riskLevel: String?
+        let confidence: Double?
+        let category: String?
+        let explanation: String?
+        
+        // Agent response fields
+        let taskId: String?
+        let wsUrl: String?
+        let estimatedTime: String?
+        let entitiesFound: Int?
         
         enum CodingKeys: String, CodingKey {
+            case type
             case riskLevel = "risk_level"
             case confidence
             case category
             case explanation
+            case taskId = "task_id"
+            case wsUrl = "ws_url"
+            case estimatedTime = "estimated_time"
+            case entitiesFound = "entities_found"
+        }
+        
+        /// Whether this is an agent response
+        var isAgentResponse: Bool {
+            return type == "agent"
         }
     }
     

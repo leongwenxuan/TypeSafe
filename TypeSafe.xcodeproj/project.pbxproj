@@ -6,9 +6,48 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		038101782EA320C5002E1512 /* TypeSafeKeyboard.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 038101712EA320C5002E1512 /* TypeSafeKeyboard.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		038101762EA320C5002E1512 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 038101572EA320B2002E1512 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 038101702EA320C5002E1512;
+			remoteInfo = TypeSafeKeyboard;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		0381017D2EA320C5002E1512 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				038101782EA320C5002E1512 /* TypeSafeKeyboard.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		0381015F2EA320B2002E1512 /* TypeSafe.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TypeSafe.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		038101712EA320C5002E1512 /* TypeSafeKeyboard.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = TypeSafeKeyboard.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		038101792EA320C5002E1512 /* Exceptions for "TypeSafeKeyboard" folder in "TypeSafeKeyboard" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 038101702EA320C5002E1512 /* TypeSafeKeyboard */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		038101612EA320B2002E1512 /* TypeSafe */ = {
@@ -16,10 +55,25 @@
 			path = TypeSafe;
 			sourceTree = "<group>";
 		};
+		038101722EA320C5002E1512 /* TypeSafeKeyboard */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				038101792EA320C5002E1512 /* Exceptions for "TypeSafeKeyboard" folder in "TypeSafeKeyboard" target */,
+			);
+			path = TypeSafeKeyboard;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		0381015C2EA320B2002E1512 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0381016E2EA320C5002E1512 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -33,6 +87,7 @@
 			isa = PBXGroup;
 			children = (
 				038101612EA320B2002E1512 /* TypeSafe */,
+				038101722EA320C5002E1512 /* TypeSafeKeyboard */,
 				038101602EA320B2002E1512 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -41,6 +96,7 @@
 			isa = PBXGroup;
 			children = (
 				0381015F2EA320B2002E1512 /* TypeSafe.app */,
+				038101712EA320C5002E1512 /* TypeSafeKeyboard.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -55,10 +111,12 @@
 				0381015B2EA320B2002E1512 /* Sources */,
 				0381015C2EA320B2002E1512 /* Frameworks */,
 				0381015D2EA320B2002E1512 /* Resources */,
+				0381017D2EA320C5002E1512 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				038101772EA320C5002E1512 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				038101612EA320B2002E1512 /* TypeSafe */,
@@ -69,6 +127,28 @@
 			productName = TypeSafe;
 			productReference = 0381015F2EA320B2002E1512 /* TypeSafe.app */;
 			productType = "com.apple.product-type.application";
+		};
+		038101702EA320C5002E1512 /* TypeSafeKeyboard */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0381017A2EA320C5002E1512 /* Build configuration list for PBXNativeTarget "TypeSafeKeyboard" */;
+			buildPhases = (
+				0381016D2EA320C5002E1512 /* Sources */,
+				0381016E2EA320C5002E1512 /* Frameworks */,
+				0381016F2EA320C5002E1512 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				038101722EA320C5002E1512 /* TypeSafeKeyboard */,
+			);
+			name = TypeSafeKeyboard;
+			packageProductDependencies = (
+			);
+			productName = TypeSafeKeyboard;
+			productReference = 038101712EA320C5002E1512 /* TypeSafeKeyboard.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -81,6 +161,9 @@
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					0381015E2EA320B2002E1512 = {
+						CreatedOnToolsVersion = 26.0.1;
+					};
+					038101702EA320C5002E1512 = {
 						CreatedOnToolsVersion = 26.0.1;
 					};
 				};
@@ -100,12 +183,20 @@
 			projectRoot = "";
 			targets = (
 				0381015E2EA320B2002E1512 /* TypeSafe */,
+				038101702EA320C5002E1512 /* TypeSafeKeyboard */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		0381015D2EA320B2002E1512 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0381016F2EA320C5002E1512 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -122,7 +213,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0381016D2EA320C5002E1512 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		038101772EA320C5002E1512 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 038101702EA320C5002E1512 /* TypeSafeKeyboard */;
+			targetProxy = 038101762EA320C5002E1512 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		038101682EA320B3002E1512 /* Debug */ = {
@@ -310,6 +416,62 @@
 			};
 			name = Release;
 		};
+		0381017B2EA320C5002E1512 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WNJQ8DDMYX;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TypeSafeKeyboard/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = TypeSafeKeyboard;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.leongwenxuan.TypeSafe.TypeSafeKeyboard;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		0381017C2EA320C5002E1512 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = WNJQ8DDMYX;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = TypeSafeKeyboard/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = TypeSafeKeyboard;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.leongwenxuan.TypeSafe.TypeSafeKeyboard;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -327,6 +489,15 @@
 			buildConfigurations = (
 				0381016B2EA320B3002E1512 /* Debug */,
 				0381016C2EA320B3002E1512 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0381017A2EA320C5002E1512 /* Build configuration list for PBXNativeTarget "TypeSafeKeyboard" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0381017B2EA320C5002E1512 /* Debug */,
+				0381017C2EA320C5002E1512 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -9,14 +9,17 @@ import uuid
 from datetime import datetime, timezone
 from typing import Callable
 
-from fastapi import FastAPI, Request, Response, HTTPException
+from fastapi import FastAPI, Request, Response, HTTPException, File, Form, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
+import imghdr
 
 from app.config import settings
-from app.services.risk_aggregator import analyze_text_aggregated
-from app.db.operations import insert_text_analysis
+from app.services.risk_aggregator import analyze_text_aggregated, aggregate_results
+from app.services.gemini_service import analyze_image
+from app.services.openai_service import analyze_text as analyze_text_openai
+from app.db.operations import insert_text_analysis, insert_scan_result, get_latest_result
 
 # Configure logging
 logging.basicConfig(
@@ -116,6 +119,44 @@ class AnalyzeTextResponse(BaseModel):
         ...,
         description="Scam category",
         examples=["otp_phishing", "payment_scam", "impersonation", "unknown"]
+    )
+    explanation: str = Field(
+        ...,
+        description="Human-friendly explanation"
+    )
+    ts: str = Field(
+        ...,
+        description="ISO timestamp of analysis",
+        examples=["2025-01-18T10:30:00Z"]
+    )
+
+
+class ScanImageResponse(BaseModel):
+    """
+    Response model for image scan endpoint.
+    
+    Attributes:
+        risk_level: Normalized risk level (low/medium/high/unknown)
+        confidence: Confidence score (0.0-1.0)
+        category: Scam category (otp_phishing/payment_scam/impersonation/visual_scam/unknown)
+        explanation: Human-friendly one-line explanation
+        ts: ISO timestamp of analysis
+    """
+    risk_level: str = Field(
+        ...,
+        description="Normalized risk level",
+        examples=["low", "medium", "high", "unknown"]
+    )
+    confidence: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Confidence score between 0.0 and 1.0"
+    )
+    category: str = Field(
+        ...,
+        description="Scam category",
+        examples=["otp_phishing", "payment_scam", "impersonation", "visual_scam", "unknown"]
     )
     explanation: str = Field(
         ...,
@@ -269,6 +310,301 @@ async def analyze_text(request: AnalyzeTextRequest, req: Request):
         # Catch-all for unexpected errors
         logger.error(
             f"Unexpected error in analyze_text: {type(e).__name__} request_id={request_id}",
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred. Please try again."
+        )
+
+
+@app.post("/scan-image", response_model=ScanImageResponse, status_code=200)
+async def scan_image(
+    session_id: str = Form(...),
+    ocr_text: str = Form(...),
+    image: UploadFile = File(None),
+    req: Request = None
+):
+    """
+    Analyze screenshot with OCR text for scam risk using AI providers.
+    
+    This endpoint receives a screenshot and/or OCR text from the companion app,
+    analyzes it for scam risk using Gemini (with OpenAI fallback), stores the 
+    result in Supabase, and returns a normalized risk assessment.
+    
+    Args:
+        session_id: Random UUID for session tracking (form field)
+        ocr_text: Text extracted from screenshot via OCR (form field, max 5000 chars)
+        image: Optional screenshot image file (PNG/JPEG, max 4MB)
+        req: FastAPI Request object for accessing request_id
+    
+    Returns:
+        ScanImageResponse with risk_level, confidence, category, explanation, and timestamp
+    
+    Raises:
+        HTTPException 400: Invalid input (malformed UUID, invalid image format/size, etc.)
+        HTTPException 422: Pydantic validation failure
+        HTTPException 500: Service error (provider failures, database error)
+    """
+    request_id = getattr(req.state, 'request_id', 'unknown') if req else 'unknown'
+    
+    try:
+        # Validate session_id UUID format
+        try:
+            session_uuid = uuid.UUID(session_id)
+        except ValueError as e:
+            logger.warning(f"Invalid UUID format: {e} request_id={request_id}")
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid session_id format. Must be a valid UUID."
+            )
+        
+        # Validate ocr_text
+        if not ocr_text or not ocr_text.strip():
+            raise HTTPException(
+                status_code=422,
+                detail="ocr_text cannot be empty or whitespace only"
+            )
+        
+        if len(ocr_text) > 5000:
+            raise HTTPException(
+                status_code=400,
+                detail="ocr_text exceeds maximum length of 5000 characters"
+            )
+        
+        # Handle image if provided
+        image_data = None
+        mime_type = None
+        
+        if image:
+            # Read image bytes
+            image_bytes = await image.read()
+            
+            # Validate image size (max 4MB)
+            if len(image_bytes) > 4 * 1024 * 1024:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Image size exceeds maximum of 4MB"
+                )
+            
+            # Validate image format using imghdr
+            image_format = imghdr.what(None, h=image_bytes)
+            if image_format not in ['png', 'jpeg']:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Invalid image format. Only PNG and JPEG are supported."
+                )
+            
+            # Set MIME type
+            mime_type = f"image/{image_format}"
+            image_data = image_bytes
+            
+            logger.info(
+                f"scan_image: session_id={session_id} "
+                f"ocr_text_length={len(ocr_text)} "
+                f"image_size={len(image_bytes)} image_format={image_format} "
+                f"request_id={request_id}"
+            )
+        else:
+            logger.info(
+                f"scan_image: session_id={session_id} "
+                f"ocr_text_length={len(ocr_text)} image=None "
+                f"request_id={request_id}"
+            )
+        
+        # Primary analysis path: Gemini
+        gemini_result = None
+        openai_result = None
+        
+        try:
+            gemini_result = await analyze_image(
+                image_data=image_data,
+                ocr_text=ocr_text,
+                mime_type=mime_type
+            )
+            logger.info(
+                f"Gemini analysis succeeded: risk_level={gemini_result.get('risk_level')} "
+                f"request_id={request_id}"
+            )
+        except Exception as e:
+            logger.warning(
+                f"Gemini analysis failed: {type(e).__name__} request_id={request_id}"
+            )
+            # Gemini failed, will try OpenAI fallback
+        
+        # Fallback path: OpenAI text-only analysis
+        if not gemini_result or gemini_result.get('risk_level') == 'unknown':
+            try:
+                openai_result = await analyze_text_openai(text=ocr_text)
+                logger.info(
+                    f"OpenAI fallback succeeded: risk_level={openai_result.get('risk_level')} "
+                    f"request_id={request_id}"
+                )
+            except Exception as e:
+                logger.warning(
+                    f"OpenAI fallback failed: {type(e).__name__} request_id={request_id}"
+                )
+        
+        # Aggregate results if both succeeded
+        if gemini_result and openai_result and \
+           gemini_result.get('risk_level') != 'unknown' and \
+           openai_result.get('risk_level') != 'unknown':
+            risk_response = aggregate_results([gemini_result, openai_result])
+            logger.info(
+                f"Results aggregated: risk_level={risk_response.get('risk_level')} "
+                f"request_id={request_id}"
+            )
+        elif gemini_result and gemini_result.get('risk_level') != 'unknown':
+            risk_response = gemini_result
+        elif openai_result and openai_result.get('risk_level') != 'unknown':
+            risk_response = openai_result
+        else:
+            # Both failed, return safe fallback
+            logger.error(
+                f"Both providers failed, returning fallback response request_id={request_id}"
+            )
+            risk_response = {
+                "risk_level": "unknown",
+                "confidence": 0.0,
+                "category": "unknown",
+                "explanation": "Unable to complete analysis"
+            }
+        
+        # Generate timestamp for response
+        timestamp = datetime.now(timezone.utc).isoformat()
+        
+        # Store result in database
+        try:
+            db_result = insert_scan_result(
+                session_id=session_uuid,
+                ocr_text=ocr_text,
+                risk_data=risk_response
+            )
+            logger.info(
+                f"Scan result stored: id={db_result.get('id')} "
+                f"risk_level={risk_response.get('risk_level')} "
+                f"request_id={request_id}"
+            )
+        except Exception as e:
+            logger.error(
+                f"Database insert failed: {type(e).__name__} request_id={request_id}",
+                exc_info=True
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to store scan result. Please try again."
+            )
+        
+        # Return normalized response with timestamp
+        response_data = {
+            **risk_response,
+            'ts': timestamp
+        }
+        
+        return ScanImageResponse(**response_data)
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        # Catch-all for unexpected errors
+        logger.error(
+            f"Unexpected error in scan_image: {type(e).__name__} request_id={request_id}",
+            exc_info=True
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred. Please try again."
+        )
+
+
+@app.get("/results/latest", response_model=AnalyzeTextResponse, status_code=200)
+async def get_latest_result_endpoint(session_id: str, req: Request):
+    """
+    Retrieve the most recent analysis result for a session.
+    
+    This endpoint queries both text_analyses and scan_results tables and
+    returns the most recent result by timestamp. Used by keyboard extension
+    to display recent scan results.
+    
+    Args:
+        session_id: UUID string identifying the session (query parameter)
+        req: FastAPI Request object for accessing request_id
+    
+    Returns:
+        AnalyzeTextResponse with risk_level, confidence, category, explanation, and timestamp
+    
+    Raises:
+        HTTPException 400: Invalid session_id format (not a valid UUID)
+        HTTPException 404: No results found for the session
+        HTTPException 422: Missing session_id query parameter
+        HTTPException 500: Database query error
+    """
+    request_id = getattr(req.state, 'request_id', 'unknown')
+    
+    try:
+        # Log incoming request (privacy: session_id only, no content)
+        logger.info(
+            f"get_latest_result: session_id={session_id} request_id={request_id}"
+        )
+        
+        # Validate session_id UUID format
+        try:
+            session_uuid = uuid.UUID(session_id)
+        except ValueError as e:
+            logger.warning(f"Invalid UUID format: {e} request_id={request_id}")
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid session_id format. Must be a valid UUID."
+            )
+        
+        # Query database for latest result
+        try:
+            latest_result = get_latest_result(session_uuid)
+        except Exception as e:
+            logger.error(
+                f"Database query failed: {type(e).__name__} request_id={request_id}",
+                exc_info=True
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to retrieve results. Please try again."
+            )
+        
+        # Return 404 if no results found
+        if not latest_result:
+            logger.info(f"No results found for session_id={session_id} request_id={request_id}")
+            raise HTTPException(
+                status_code=404,
+                detail="No results found for this session."
+            )
+        
+        # Extract data from latest_result
+        result_data = latest_result['data']
+        
+        # Build response with unified schema
+        response_data = {
+            'risk_level': result_data['risk_level'],
+            'confidence': result_data['confidence'],
+            'category': result_data['category'],
+            'explanation': result_data['explanation'],
+            'ts': result_data['created_at']
+        }
+        
+        logger.info(
+            f"Latest result retrieved: type={latest_result['type']} "
+            f"risk_level={response_data['risk_level']} request_id={request_id}"
+        )
+        
+        return AnalyzeTextResponse(**response_data)
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        # Catch-all for unexpected errors
+        logger.error(
+            f"Unexpected error in get_latest_result: {type(e).__name__} request_id={request_id}",
             exc_info=True
         )
         raise HTTPException(

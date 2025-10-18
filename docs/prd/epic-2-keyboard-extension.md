@@ -98,7 +98,28 @@ This epic delivers the primary user-facing feature of TypeSafe: a custom iOS key
 
 ---
 
-### Story 2.5: "Explain Why" Popover Detail
+### Story 2.5: Complete Keyboard Layouts (Numbers & Symbols)
+
+**As a** keyboard user,  
+**I want** to type numbers and symbols using the TypeSafe keyboard,  
+**so that** I can use it as my primary keyboard for all text input needs.
+
+**Acceptance Criteria:**
+1. "123" button switches from letter layout to number/symbol layout
+2. Number layout displays: 0-9, @, #, $, %, &, *, (, ), -, +, =
+3. "#+=" button on number layout switches to extended symbols layout
+4. Extended symbols layout shows: !, ?, ", ', :, ;, /, \, |, ~, `, <, >, [, ], {, }, ^, _
+5. "ABC" button on number/symbol layouts returns to letter layout
+6. Shift key works on number/symbol layouts (alternate symbol variants if applicable)
+7. Layout state persists correctly during typing session
+8. All layouts maintain consistent visual style and dimensions
+
+**Priority:** P0  
+**Note:** This story addresses technical debt from Story 2.1 which only implemented letter layout. The "123" button existed but was non-functional.
+
+---
+
+### Story 2.6: "Explain Why" Popover Detail
 
 **As a** keyboard user,  
 **I want** to tap the alert banner to see why text was flagged,  
@@ -118,7 +139,7 @@ This epic delivers the primary user-facing feature of TypeSafe: a custom iOS key
 
 ---
 
-### Story 2.6: App Group Shared State
+### Story 2.7: App Group Shared State
 
 **As a** keyboard extension,  
 **I want** to share minimal state with the companion app via App Group,  
@@ -136,7 +157,7 @@ This epic delivers the primary user-facing feature of TypeSafe: a custom iOS key
 
 ---
 
-### Story 2.7: Privacy & Full Access Handling
+### Story 2.8: Privacy & Full Access Handling
 
 **As a** keyboard user,  
 **I want** clear prompts about Full Access and privacy,  
@@ -154,7 +175,7 @@ This epic delivers the primary user-facing feature of TypeSafe: a custom iOS key
 
 ---
 
-### Story 2.8: Keyboard Performance & Stability
+### Story 2.9: Keyboard Performance & Stability
 
 **As a** keyboard user,  
 **I want** the keyboard to be responsive and stable,  
@@ -203,8 +224,9 @@ This epic delivers the primary user-facing feature of TypeSafe: a custom iOS key
 
 ## Definition of Done
 
-- [ ] All 8 stories completed with acceptance criteria met
+- [ ] All 9 stories completed with acceptance criteria met
 - [ ] Keyboard extension can be installed and enabled on iOS device
+- [ ] Complete keyboard layouts (letters, numbers, symbols) functional
 - [ ] Real-time scam detection works end-to-end (typing → backend → alert)
 - [ ] Alert banners display correctly for medium/high risk detections
 - [ ] "Explain Why" popover shows detailed scam information
@@ -216,7 +238,9 @@ This epic delivers the primary user-facing feature of TypeSafe: a custom iOS key
 
 ## Notes
 
-This epic delivers the core value proposition of TypeSafe. Stories 2.1-2.4 are critical path (P0) and must be completed sequentially. Stories 2.5-2.6 enhance UX (P1) and can be completed in parallel with later P0 stories.
+This epic delivers the core value proposition of TypeSafe. Stories 2.1-2.5 and 2.8-2.9 are critical path (P0) and must be completed sequentially. Stories 2.6-2.7 enhance UX (P1) and can be completed in parallel with later P0 stories.
+
+**Story Numbering Note:** Story 2.5 was added after initial epic planning to address technical debt from Story 2.1 (complete keyboard layouts for numbers/symbols). Original stories 2.5-2.8 were renumbered to 2.6-2.9.
 
 **Estimated Timeline:** Week 2 (5-7 days of focused development)
 

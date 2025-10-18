@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     Application settings loaded from environment variables.
     
     Required variables:
-    - OPENAI_API_KEY: OpenAI API key for text analysis
+    - GROQ_API_KEY: Groq API key for text analysis
     - GEMINI_API_KEY: Google Gemini API key for multimodal analysis
     - SUPABASE_URL: Supabase project URL
     - SUPABASE_KEY: Supabase API key
@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     environment: str = Field(default="local", alias="ENVIRONMENT")
     
     # API Keys
-    openai_api_key: str = Field(default="", alias="OPENAI_API_KEY")
+    groq_api_key: str = Field(default="", alias="GROQ_API_KEY")
     gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
     supabase_url: str = Field(default="", alias="SUPABASE_URL")
     supabase_key: str = Field(default="", alias="SUPABASE_KEY")
@@ -53,7 +53,7 @@ class Settings(BaseSettings):
             ValueError: If any required key is missing
         """
         required_keys = {
-            "OPENAI_API_KEY": self.openai_api_key,
+            "GROQ_API_KEY": self.groq_api_key,
             "GEMINI_API_KEY": self.gemini_api_key,
             "SUPABASE_URL": self.supabase_url,
             "SUPABASE_KEY": self.supabase_key,

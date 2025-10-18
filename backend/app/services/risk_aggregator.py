@@ -2,7 +2,7 @@
 Risk aggregation and normalization for multi-provider scam detection.
 
 This module provides a unified interface for combining results from multiple
-AI providers (OpenAI, Gemini) into a consistent response format. It handles:
+AI providers (Groq, Gemini) into a consistent response format. It handles:
 - Single-provider normalization
 - Multi-provider result aggregation
 - Confidence score normalization
@@ -13,7 +13,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 
-from app.services import openai_service, gemini_service
+from app.services import groq_service, gemini_service
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -124,7 +124,7 @@ def normalize_response(response: Dict[str, Any], provider: str = "unknown") -> D
     Normalize a provider response to unified schema.
     
     This adds a timestamp and ensures all fields are properly formatted.
-    Provider services (openai_service, gemini_service) already normalize
+    Provider services (groq_service, gemini_service) already normalize
     their responses, so this mainly adds the timestamp and validates.
     
     Args:
@@ -236,10 +236,10 @@ def create_fallback_response(error_context: str) -> Dict[str, Any]:
 
 async def analyze_text_aggregated(text: str) -> Dict[str, Any]:
     """
-    Analyze text using OpenAI with unified response format.
+    Analyze text using Groq with unified response format.
     
     Convenience function that:
-    1. Calls OpenAI service
+    1. Calls Groq service
     2. Normalizes response (adds timestamp)
     3. Handles errors gracefully
     
@@ -250,15 +250,15 @@ async def analyze_text_aggregated(text: str) -> Dict[str, Any]:
         Unified schema response with timestamp
     """
     try:
-        # OpenAI service already returns normalized response
-        response = await openai_service.analyze_text(text)
+        # Groq service already returns normalized response
+        response = await groq_service.analyze_text(text)
         
         # Add timestamp and validate
-        return normalize_response(response, provider="openai")
+        return normalize_response(response, provider="groq")
     
     except Exception as e:
         logger.error(f"Error in text analysis aggregation: {e}")
-        return create_fallback_response(f"OpenAI service error: {str(e)}")
+        return create_fallback_response(f"Groq service error: {str(e)}")
 
 
 async def analyze_image_aggregated(
@@ -305,18 +305,18 @@ async def analyze_multimodal_aggregated(
     use_fallback: bool = True
 ) -> Dict[str, Any]:
     """
-    Analyze image+text using both Gemini and OpenAI (optional fallback).
+    Analyze image+text using both Gemini and Groq (optional fallback).
     
     Strategy:
     1. Always use Gemini for multimodal analysis (primary)
-    2. Optionally use OpenAI for text-only analysis (fallback)
+    2. Optionally use Groq for text-only analysis (fallback)
     3. Aggregate results if both providers used
     
     Args:
         image_data: Image bytes
         ocr_text: OCR text from image
         mime_type: Optional MIME type
-        use_fallback: Whether to use OpenAI as text fallback (default True)
+        use_fallback: Whether to use Groq as text fallback (default True)
         
     Returns:
         Aggregated unified schema response
@@ -334,13 +334,13 @@ async def analyze_multimodal_aggregated(
     except Exception as e:
         logger.error(f"Gemini analysis failed: {e}")
     
-    # Fallback: OpenAI text-only analysis (if enabled and text available)
+    # Fallback: Groq text-only analysis (if enabled and text available)
     if use_fallback and ocr_text:
         try:
-            openai_response = await analyze_text_aggregated(text=ocr_text)
-            results.append(openai_response)
+            groq_response = await analyze_text_aggregated(text=ocr_text)
+            results.append(groq_response)
         except Exception as e:
-            logger.error(f"OpenAI fallback analysis failed: {e}")
+            logger.error(f"Groq fallback analysis failed: {e}")
     
     # Aggregate all results
     if results:

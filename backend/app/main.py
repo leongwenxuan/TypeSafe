@@ -18,7 +18,7 @@ import imghdr
 from app.config import settings
 from app.services.risk_aggregator import analyze_text_aggregated, aggregate_results
 from app.services.gemini_service import analyze_image
-from app.services.openai_service import analyze_text as analyze_text_openai
+from app.services.groq_service import analyze_text as analyze_text_groq
 from app.db.operations import insert_text_analysis, insert_scan_result, get_latest_result
 
 # Configure logging
@@ -222,7 +222,7 @@ async def analyze_text(request: AnalyzeTextRequest, req: Request):
     Analyze text snippet for scam risk using AI providers.
     
     This endpoint receives text from the iOS keyboard extension, analyzes it
-    for scam risk using OpenAI, stores the result in Supabase, and returns
+    for scam risk using Groq, stores the result in Supabase, and returns
     a normalized risk assessment.
     
     Args:
@@ -234,7 +234,7 @@ async def analyze_text(request: AnalyzeTextRequest, req: Request):
     
     Raises:
         HTTPException 400: Invalid input (malformed UUID, empty text, etc.)
-        HTTPException 500: Service error (OpenAI failure, database error)
+        HTTPException 500: Service error (Groq failure, database error)
     """
     request_id = getattr(req.state, 'request_id', 'unknown')
     
@@ -329,7 +329,7 @@ async def scan_image(
     Analyze screenshot with OCR text for scam risk using AI providers.
     
     This endpoint receives a screenshot and/or OCR text from the companion app,
-    analyzes it for scam risk using Gemini (with OpenAI fallback), stores the 
+    analyzes it for scam risk using Gemini (with Groq fallback), stores the 
     result in Supabase, and returns a normalized risk assessment.
     
     Args:
@@ -430,19 +430,19 @@ async def scan_image(
             logger.warning(
                 f"Gemini analysis failed: {type(e).__name__} request_id={request_id}"
             )
-            # Gemini failed, will try OpenAI fallback
+            # Gemini failed, will try Groq fallback
         
-        # Fallback path: OpenAI text-only analysis
+        # Fallback path: Groq text-only analysis
         if not gemini_result or gemini_result.get('risk_level') == 'unknown':
             try:
-                openai_result = await analyze_text_openai(text=ocr_text)
+                openai_result = await analyze_text_groq(text=ocr_text)
                 logger.info(
-                    f"OpenAI fallback succeeded: risk_level={openai_result.get('risk_level')} "
+                    f"Groq fallback succeeded: risk_level={openai_result.get('risk_level')} "
                     f"request_id={request_id}"
                 )
             except Exception as e:
                 logger.warning(
-                    f"OpenAI fallback failed: {type(e).__name__} request_id={request_id}"
+                    f"Groq fallback failed: {type(e).__name__} request_id={request_id}"
                 )
         
         # Aggregate results if both succeeded

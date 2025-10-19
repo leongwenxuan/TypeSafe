@@ -43,6 +43,12 @@ class HistoryManager: ObservableObject {
         thumbnailData: Data? = nil,
         isAutoScanned: Bool = false
     ) {
+        print("💾 HistoryManager: saveToHistory called")
+        print("  - Session ID: \(sessionId)")
+        print("  - Risk Level: \(riskLevel)")
+        print("  - Category: \(category)")
+        print("  - OCR Text length: \(ocrText.count)")
+        
         let context = persistenceController.container.viewContext
         
         let historyItem = ScanHistoryItem(context: context)
@@ -57,7 +63,23 @@ class HistoryManager: ObservableObject {
         historyItem.timestamp = Date()
         historyItem.isAutoScanned = isAutoScanned
         
+        print("💾 HistoryManager: Created history item with ID: \(historyItem.id?.uuidString ?? "none")")
+        print("💾 HistoryManager: Calling save on PersistenceController...")
+        
         persistenceController.save()
+        
+        print("💾 HistoryManager: Save completed")
+        
+        // Verify the save
+        let count = getHistoryCount()
+        print("💾 HistoryManager: Total items in DB after save: \(count)")
+        
+        // Try to fetch the item we just saved
+        let items = getRecentHistory()
+        print("💾 HistoryManager: Recent items (last 5): \(items.count)")
+        if let first = items.first {
+            print("  - Most recent: \(first.category ?? "unknown") - \(first.riskLevel ?? "unknown")")
+        }
     }
     
     /// Get recent history items (last 5, newest first)

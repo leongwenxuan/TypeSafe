@@ -77,8 +77,13 @@ struct OCRTextPreviewView: View {
     // MARK: - Body
     
     var body: some View {
-        VStack(spacing: 20) {
-            // Header
+        ZStack {
+            // Ensure proper background color
+            Color(.systemBackground)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 20) {
+                // Header
             VStack(spacing: 8) {
                 Image(systemName: "doc.text.magnifyingglass")
                     .font(.system(size: 40))
@@ -223,6 +228,7 @@ struct OCRTextPreviewView: View {
             }
             
             Spacer()
+            }
         }
         .padding()
         .navigationTitle("OCR Preview")
@@ -272,6 +278,7 @@ struct OCRTextPreviewView: View {
                 AgentProgressView(
                     taskId: taskId,
                     wsUrl: wsUrl,
+                    analyzedText: editableText,
                     onDismiss: {
                         // Reset state and go back
                         resetState()

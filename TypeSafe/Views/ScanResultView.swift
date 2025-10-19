@@ -93,8 +93,13 @@ struct ScanResultView: View {
     // MARK: - Body
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
+        ZStack {
+            // Ensure proper background color
+            Color(.systemBackground)
+                .ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: 24) {
                 // Risk level indicator
                 VStack(spacing: 16) {
                     Image(systemName: riskIcon)
@@ -119,9 +124,9 @@ struct ScanResultView: View {
                         
                         Text(result.explanation ?? "Analysis completed")
                             .font(.body)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.primary)
                             .padding()
-                            .background(Color.gray.opacity(0.1))
+                            .background(Color(.secondarySystemGroupedBackground))
                             .cornerRadius(12)
                     }
                     
@@ -157,7 +162,7 @@ struct ScanResultView: View {
                             )
                         }
                         .padding()
-                        .background(Color.gray.opacity(0.1))
+                        .background(Color(.secondarySystemGroupedBackground))
                         .cornerRadius(12)
                     }
                     
@@ -169,9 +174,9 @@ struct ScanResultView: View {
                         
                         Text(analyzedText)
                             .font(.body)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.primary)
                             .padding()
-                            .background(Color.gray.opacity(0.1))
+                            .background(Color(.secondarySystemGroupedBackground))
                             .cornerRadius(12)
                     }
                 }
@@ -225,6 +230,7 @@ struct ScanResultView: View {
                 }
             }
             .padding()
+            }
         }
         .navigationTitle("Scan Results")
         .navigationBarTitleDisplayMode(.inline)

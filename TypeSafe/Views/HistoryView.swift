@@ -25,6 +25,9 @@ struct HistoryView: View {
     /// Loading state for pull-to-refresh
     @State private var isRefreshing = false
     
+    /// Refresh trigger for manual updates
+    @State private var refreshTrigger = false
+    
     /// Filtered history items (last 7 days only)
     private var filteredHistoryItems: [ScanHistoryItem] {
         let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
@@ -48,6 +51,29 @@ struct HistoryView: View {
             .refreshable {
                 await refreshHistory()
             }
+            .onAppear {
+                let total = historyItems.count
+                let filtered = filteredHistoryItems.count
+                print("📊 HistoryView appeared:")
+                print("  - Total history items: \(total)")
+                print("  - Filtered items (last 7 days): \(filtered)")
+                print("  - Displayed items (max 5): \(min(filtered, 5))")
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("HistoryDidChange"))) { _ in
+                print("📊 HistoryView: Received HistoryDidChange notification")
+                // Trigger a UI refresh
+                refreshTrigger.toggle()
+                
+                // Log current state after notification
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    let total = historyItems.count
+                    let filtered = filteredHistoryItems.count
+                    print("📊 HistoryView: After notification refresh:")
+                    print("  - Total history items: \(total)")
+                    print("  - Filtered items (last 7 days): \(filtered)")
+                }
+            }
+            .id(refreshTrigger) // Force view refresh when trigger changes
         }
     }
     
@@ -88,20 +114,6 @@ struct EmptyHistoryView: View {
                 .font(.body)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
-            
-            // Optional scan now button
-            NavigationLink(destination: EmptyView()) {
-                HStack {
-                    Image(systemName: "camera.viewfinder")
-                    Text("Scan Now")
-                }
-                .font(.headline)
-                .foregroundColor(.white)
-                .padding()
-                .background(Color.blue)
-                .cornerRadius(10)
-            }
-            .accessibilityLabel("Navigate to scan tab")
         }
         .padding()
     }
@@ -157,7 +169,7 @@ struct ScanResultDetailView: View {
                     }
                 }
                 .padding()
-                .background(Color.gray.opacity(0.1))
+                .background(Color(.secondarySystemGroupedBackground))
                 .cornerRadius(10)
                 
                 // OCR text
@@ -168,7 +180,7 @@ struct ScanResultDetailView: View {
                         
                         Text(historyItem.ocrText ?? "")
                             .padding()
-                            .background(Color.gray.opacity(0.1))
+                            .background(Color(.secondarySystemGroupedBackground))
                             .cornerRadius(10)
                             .font(.system(.body, design: .monospaced))
                     }

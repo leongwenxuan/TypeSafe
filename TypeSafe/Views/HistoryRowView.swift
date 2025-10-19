@@ -67,7 +67,7 @@ struct HistoryRowView: View {
                         }
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.gray.opacity(0.1))
+                        .background(Color(.secondarySystemGroupedBackground))
                         .cornerRadius(4)
                         .accessibilityLabel("Manually selected")
                     }

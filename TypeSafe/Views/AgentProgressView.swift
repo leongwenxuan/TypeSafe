@@ -13,25 +13,43 @@ struct AgentProgressView: View {
     
     // MARK: - Properties
     
+    @Environment(\.dismiss) private var dismiss
+    
     @StateObject private var viewModel: AgentProgressViewModel
     
     /// Callback when user wants to return to scan view
     let onDismiss: () -> Void
     
+    /// OCR text that was analyzed
+    private let analyzedText: String
+    
+    /// Whether this was an auto-scanned screenshot
+    private let isAutoScanned: Bool
+    
+    /// Whether the result has been saved to history
+    @State private var hasSavedToHistory = false
+    
     // MARK: - Initialization
     
-    init(taskId: String, wsUrl: String, onDismiss: @escaping () -> Void) {
+    init(taskId: String, wsUrl: String, analyzedText: String = "", isAutoScanned: Bool = false, onDismiss: @escaping () -> Void) {
         _viewModel = StateObject(wrappedValue: AgentProgressViewModel(taskId: taskId, wsUrl: wsUrl))
         self.onDismiss = onDismiss
+        self.analyzedText = analyzedText
+        self.isAutoScanned = isAutoScanned
     }
     
     // MARK: - Body
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Header
-                headerSection
+        ZStack {
+            // Ensure proper background color
+            Color(.systemBackground)
+                .ignoresSafeArea()
+            
+            ScrollView {
+                VStack(spacing: 24) {
+                    // Header
+                    headerSection
                 
                 // Progress bar
                 if !viewModel.isComplete && !viewModel.isFailed {
@@ -58,9 +76,10 @@ struct AgentProgressView: View {
                     errorSection
                 }
                 
-                Spacer()
+                    Spacer()
+                }
+                .padding()
             }
-            .padding()
         }
         .navigationTitle("Agent Analysis")
         .navigationBarTitleDisplayMode(.inline)
@@ -76,11 +95,88 @@ struct AgentProgressView: View {
             if viewModel.isComplete || viewModel.isFailed {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") {
+                        print("AgentProgressView: Done button tapped, dismissing...")
                         onDismiss()
+                        dismiss()
                     }
                 }
             }
         }
+        .onChange(of: viewModel.isComplete) { oldValue, newValue in
+            print("AgentProgressView: isComplete changed from \(oldValue) to \(newValue)")
+            print("  - hasSavedToHistory: \(hasSavedToHistory)")
+            print("  - finalResult present: \(viewModel.finalResult != nil)")
+            
+            // Auto-save to history when analysis completes successfully
+            if newValue && !hasSavedToHistory, let finalResult = viewModel.finalResult {
+                print("AgentProgressView: Triggering auto-save to history...")
+                saveToHistory(result: finalResult)
+                hasSavedToHistory = true
+            } else {
+                print("AgentProgressView: Skipping auto-save (already saved or no result)")
+            }
+        }
+    }
+    
+    // MARK: - Private Methods
+    
+    /// Save agent analysis result to history
+    private func saveToHistory(result: AgentAnalysisResult) {
+        print("🟢 AgentProgressView: Saving agent result to history")
+        print("  - Risk Level: \(result.riskLevel)")
+        print("  - Confidence: \(result.confidence)")
+        print("  - Reasoning: \(result.reasoning)")
+        print("  - OCR Text length: \(analyzedText.count) chars")
+        print("  - Is Auto-Scanned: \(isAutoScanned)")
+        
+        let sessionId = UserDefaults.standard.string(forKey: "session_id") ?? UUID().uuidString
+        print("  - Session ID: \(sessionId)")
+        
+        // Derive category from evidence or use generic "agent_analysis"
+        let category = deriveCategory(from: result)
+        print("  - Derived Category: \(category)")
+        
+        HistoryManager.shared.saveToHistory(
+            sessionId: sessionId,
+            riskLevel: result.riskLevel,
+            confidence: Double(result.confidence) / 100.0,  // Convert percentage to 0-1
+            category: category,
+            explanation: result.reasoning,
+            ocrText: analyzedText,
+            thumbnailData: nil,
+            isAutoScanned: isAutoScanned
+        )
+        
+        // Verify save
+        let count = HistoryManager.shared.getHistoryCount()
+        print("🟢 AgentProgressView: ✅ Saved to history successfully!")
+        print("  - Total history items: \(count)")
+        print("  - Category: \(category)")
+        print("  - Risk Level: \(result.riskLevel)")
+    }
+    
+    /// Derive category from analysis result
+    private func deriveCategory(from result: AgentAnalysisResult) -> String {
+        // Check if we have phone evidence
+        let hasPhoneEvidence = result.evidence.contains { $0.entityType.lowercased() == "phone" }
+        if hasPhoneEvidence {
+            return "phone_scam"
+        }
+        
+        // Check if we have URL evidence
+        let hasUrlEvidence = result.evidence.contains { $0.entityType.lowercased() == "url" }
+        if hasUrlEvidence {
+            return "phishing"
+        }
+        
+        // Check if we have email evidence
+        let hasEmailEvidence = result.evidence.contains { $0.entityType.lowercased() == "email" }
+        if hasEmailEvidence {
+            return "email_scam"
+        }
+        
+        // Default to agent analysis
+        return "agent_analysis"
     }
     
     // MARK: - View Components
@@ -184,7 +280,7 @@ struct AgentProgressView: View {
             }
         }
         .padding()
-        .background(Color.gray.opacity(0.05))
+        .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(12)
     }
     
@@ -278,7 +374,7 @@ struct ToolResultRow: View {
                 
                 Text(result.summary)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.primary)
                     .lineLimit(2)
             }
             
@@ -289,7 +385,7 @@ struct ToolResultRow: View {
                 .foregroundColor(result.isSuccess ? .green : .orange)
         }
         .padding(12)
-        .background(Color.white)
+        .background(Color(.systemBackground))
         .cornerRadius(8)
         .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
     }
@@ -319,7 +415,7 @@ struct FinalVerdictCard: View {
                     
                     Text("\(Int(result.confidence))% Confidence")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.primary)
                 }
                 
                 Spacer()
@@ -341,7 +437,7 @@ struct FinalVerdictCard: View {
                     .font(.body)
                     .foregroundColor(.primary)
                     .padding()
-                    .background(Color.gray.opacity(0.1))
+                    .background(Color(.secondarySystemGroupedBackground))
                     .cornerRadius(8)
             }
             
@@ -415,7 +511,7 @@ struct FinalVerdictCard: View {
             }
         }
         .padding()
-        .background(Color.white)
+        .background(Color(.systemBackground))
         .cornerRadius(16)
         .shadow(color: Color.black.opacity(0.1), radius: 8, x: 0, y: 4)
     }
@@ -438,7 +534,7 @@ struct FinalVerdictCard: View {
             }
         }
         .padding()
-        .background(Color.gray.opacity(0.1))
+        .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(8)
     }
     
@@ -453,7 +549,7 @@ struct FinalVerdictCard: View {
                 Text(label)
                     .font(.caption)
                     .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.primary)
                 
                 ForEach(values, id: \.self) { value in
                     Text(value)
@@ -474,7 +570,7 @@ struct FinalVerdictCard: View {
             }
         }
         .padding()
-        .background(Color.gray.opacity(0.05))
+        .background(Color(.secondarySystemGroupedBackground))
         .cornerRadius(8)
     }
     
@@ -541,14 +637,14 @@ struct EvidenceRow: View {
                 if let executionTime = evidence.executionTimeMs {
                     Text("\(Int(executionTime))ms")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.primary)
                 }
             }
             
             HStack(spacing: 6) {
                 Text(evidence.entityType.capitalized + ":")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.primary)
                 
                 Text(evidence.entityValue)
                     .font(.caption)
@@ -557,7 +653,7 @@ struct EvidenceRow: View {
             }
         }
         .padding(12)
-        .background(Color.white)
+        .background(Color(.systemBackground))
         .cornerRadius(8)
         .overlay(
             RoundedRectangle(cornerRadius: 8)

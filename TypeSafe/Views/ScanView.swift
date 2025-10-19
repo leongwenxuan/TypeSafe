@@ -50,6 +50,10 @@ struct ScanView: View {
     var body: some View {
         NavigationStack {
             ZStack {
+                // Ensure proper background color
+                Color(.systemBackground)
+                    .ignoresSafeArea()
+                
                 VStack(spacing: 24) {
                 if showingOCRPreview {
                     // OCR text preview state
@@ -160,6 +164,7 @@ struct ScanView: View {
                             .fontWeight(.semibold)
                             .foregroundColor(.primary)
                     }
+                    .padding(.top, 40)
                     
                     // Description
                     Text("Select a screenshot from your photos or take a new one to analyze text for potential scams and security threats.")
@@ -167,6 +172,7 @@ struct ScanView: View {
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
+                        .fixedSize(horizontal: false, vertical: true)
                     
                     // Action buttons
                     VStack(spacing: 12) {
@@ -302,6 +308,8 @@ struct ScanView: View {
                     AgentProgressView(
                         taskId: taskId,
                         wsUrl: wsUrl,
+                        analyzedText: extractedText,
+                        isAutoScanned: isAutoScannedImage,
                         onDismiss: {
                             // Reset and go back to scan view
                             resetToInitialState()

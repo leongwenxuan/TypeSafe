@@ -61,12 +61,29 @@ class PersistenceController: ObservableObject {
     func save() {
         let context = container.viewContext
         
+        print("💽 PersistenceController: save() called")
+        print("  - Context has changes: \(context.hasChanges)")
+        
         if context.hasChanges {
             do {
                 try context.save()
+                print("💽 PersistenceController: ✅ Context saved successfully")
+                
+                // Ensure UI updates by processing pending changes
+                context.processPendingChanges()
+                print("💽 PersistenceController: Processed pending changes")
+                
+                // Post notification to ensure UI refresh (belt and suspenders approach)
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: NSNotification.Name("HistoryDidChange"), object: nil)
+                    print("💽 PersistenceController: Posted HistoryDidChange notification")
+                }
             } catch {
-                print("Failed to save Core Data context: \(error)")
+                print("❌ PersistenceController: Failed to save Core Data context: \(error)")
+                print("  - Error details: \(error.localizedDescription)")
             }
+        } else {
+            print("💽 PersistenceController: No changes to save")
         }
     }
 }

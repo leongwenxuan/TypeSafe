@@ -14,8 +14,13 @@ struct ImagePreviewView: View {
     let onChooseDifferent: () -> Void
     
     var body: some View {
-        VStack(spacing: 20) {
-            // Image preview with proper scaling
+        ZStack {
+            // Ensure proper background color
+            Color(.systemBackground)
+                .ignoresSafeArea()
+            
+            VStack(spacing: 20) {
+                // Image preview with proper scaling
             Image(uiImage: image)
                 .resizable()
                 .aspectRatio(contentMode: .fit)
@@ -55,6 +60,7 @@ struct ImagePreviewView: View {
                 }
                 .accessibilityLabel("Choose a different image")
                 .accessibilityHint("Go back to select a different image")
+            }
             }
         }
         .padding()

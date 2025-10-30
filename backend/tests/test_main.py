@@ -168,6 +168,8 @@ class TestAppStartup:
         assert app.title == "TypeSafe API"
 
 
+# DISABLED: Analyse Text feature shelved - see docs/EPIC_12_DISABLED_TESTS.md for reactivation
+@pytest.mark.skip(reason="Analyse Text feature shelved - Epic 12")
 class TestAnalyzeTextEndpoint:
     """Test suite for POST /analyze-text endpoint"""
     
@@ -342,6 +344,8 @@ class TestAnalyzeTextEndpoint:
         assert response.status_code == 200
 
 
+# DISABLED: Analyse Text feature shelved - see docs/EPIC_12_DISABLED_TESTS.md for reactivation
+@pytest.mark.skip(reason="Analyse Text feature shelved - Epic 12")
 class TestAnalyzeTextValidation:
     """Test suite for request validation on /analyze-text endpoint"""
     
@@ -472,6 +476,8 @@ class TestAnalyzeTextValidation:
         assert response.status_code == 200
 
 
+# DISABLED: Analyse Text feature shelved - see docs/EPIC_12_DISABLED_TESTS.md for reactivation
+@pytest.mark.skip(reason="Analyse Text feature shelved - Epic 12")
 class TestAnalyzeTextErrorHandling:
     """Test suite for error handling on /analyze-text endpoint"""
     
@@ -557,6 +563,8 @@ class TestAnalyzeTextErrorHandling:
         assert 'user:pass' not in detail
 
 
+# DISABLED: Analyse Text feature shelved - see docs/EPIC_12_DISABLED_TESTS.md for reactivation
+@pytest.mark.skip(reason="Analyse Text feature shelved - Epic 12")
 class TestAnalyzeTextPerformance:
     """Test suite for performance validation on /analyze-text endpoint"""
     
@@ -1521,4 +1529,178 @@ class TestGetLatestResultPrivacy:
         get_latest_logs = [str(call) for call in mock_logger.info.call_args_list if 'get_latest_result:' in str(call)]
         assert len(get_latest_logs) > 0
         assert any('session_id' in log for log in get_latest_logs)
+
+
+class TestAnalyzeTextFeatureFlagDisabled:
+    """Test suite for /analyze-text endpoint feature flag disabled behavior (Story 12.4)"""
+
+    def test_analyze_text_disabled_returns_503(self, client):
+        """Test /analyze-text returns 503 when feature flag is disabled"""
+        from unittest.mock import patch
+
+        with patch('app.config.settings.enable_analyse_text', False):
+            response = client.post(
+                "/analyze-text",
+                json={
+                    "session_id": "123e4567-e89b-12d3-a456-426614174000",
+                    "app_bundle": "com.whatsapp",
+                    "text": "Test message"
+                }
+            )
+
+        assert response.status_code == 503
+        data = response.json()
+        assert 'detail' in data
+        assert 'Text analysis feature is temporarily unavailable' in data['detail']
+
+    def test_analyze_text_disabled_no_database_writes(self, client):
+        """Test no database writes occur when feature flag disabled"""
+        from unittest.mock import patch, AsyncMock
+
+        with patch('app.config.settings.enable_analyse_text', False):
+            with patch('app.main.insert_text_analysis') as mock_insert:
+                with patch('app.main.analyze_text_aggregated', new_callable=AsyncMock) as mock_analyze:
+                    response = client.post(
+                        "/analyze-text",
+                        json={
+                            "session_id": "123e4567-e89b-12d3-a456-426614174000",
+                            "app_bundle": "com.whatsapp",
+                            "text": "Test message"
+                        }
+                    )
+
+        assert response.status_code == 503
+        # Verify neither API call nor database insert occurred
+        mock_analyze.assert_not_called()
+        mock_insert.assert_not_called()
+
+    def test_analyze_text_disabled_early_return(self, client):
+        """Test endpoint returns early when feature flag disabled"""
+        from unittest.mock import patch
+
+        with patch('app.config.settings.enable_analyse_text', False):
+            # Send multiple requests
+            for _ in range(3):
+                response = client.post(
+                    "/analyze-text",
+                    json={
+                        "session_id": "123e4567-e89b-12d3-a456-426614174000",
+                        "app_bundle": "com.whatsapp",
+                        "text": "Test message"
+                    }
+                )
+                assert response.status_code == 503
+
+    def test_analyze_text_disabled_with_invalid_uuid_returns_503_not_400(self, client):
+        """Test feature flag check happens before UUID validation"""
+        from unittest.mock import patch
+
+        with patch('app.config.settings.enable_analyse_text', False):
+            # Invalid UUID, but should return 503 because feature flag check comes first
+            response = client.post(
+                "/analyze-text",
+                json={
+                    "session_id": "not-a-valid-uuid",
+                    "app_bundle": "com.whatsapp",
+                    "text": "Test message"
+                }
+            )
+
+        # Feature flag check should happen first, returning 503, not 422 (validation)
+        assert response.status_code == 503
+
+    def test_analyze_text_enabled_processes_normally(self, client):
+        """Test endpoint processes normally when feature flag enabled"""
+        from unittest.mock import patch, AsyncMock
+
+        mock_risk_response = {
+            'risk_level': 'low',
+            'confidence': 0.15,
+            'category': 'unknown',
+            'explanation': 'No scam indicators',
+            'ts': '2025-01-18T10:30:00Z'
+        }
+
+        mock_db_response = {'id': 'test-id', 'created_at': '2025-01-18T10:30:00Z'}
+
+        with patch('app.config.settings.enable_analyse_text', True):
+            with patch('app.main.analyze_text_aggregated', new_callable=AsyncMock) as mock_analyze:
+                with patch('app.main.insert_text_analysis') as mock_insert:
+                    mock_analyze.return_value = mock_risk_response.copy()
+                    mock_insert.return_value = mock_db_response
+
+                    response = client.post(
+                        "/analyze-text",
+                        json={
+                            "session_id": "123e4567-e89b-12d3-a456-426614174000",
+                            "app_bundle": "com.whatsapp",
+                            "text": "Test message"
+                        }
+                    )
+
+        assert response.status_code == 200
+        # Verify both API call and database insert were called
+        mock_analyze.assert_called_once()
+        mock_insert.assert_called_once()
+
+    def test_analyze_text_disabled_response_format_is_valid(self, client):
+        """Test 503 response has valid JSON structure"""
+        from unittest.mock import patch
+
+        with patch('app.config.settings.enable_analyse_text', False):
+            response = client.post(
+                "/analyze-text",
+                json={
+                    "session_id": "123e4567-e89b-12d3-a456-426614174000",
+                    "app_bundle": "com.whatsapp",
+                    "text": "Test message"
+                }
+            )
+
+        assert response.status_code == 503
+        # Should be valid JSON
+        data = response.json()
+        assert isinstance(data, dict)
+        assert 'detail' in data
+        assert isinstance(data['detail'], str)
+
+    def test_analyze_text_disabled_logs_rejection(self, client):
+        """Test rejection is logged when feature flag disabled"""
+        from unittest.mock import patch
+
+        with patch('app.config.settings.enable_analyse_text', False):
+            with patch('app.main.logger') as mock_logger:
+                response = client.post(
+                    "/analyze-text",
+                    json={
+                        "session_id": "123e4567-e89b-12d3-a456-426614174000",
+                        "app_bundle": "com.whatsapp",
+                        "text": "Test message"
+                    }
+                )
+
+        assert response.status_code == 503
+        # Verify rejection was logged
+        mock_logger.info.assert_called()
+        call_args_list = [str(call) for call in mock_logger.info.call_args_list]
+        assert any('Analyse Text feature disabled' in str(call) for call in call_args_list)
+
+    def test_analyze_text_disabled_doesnt_crash(self, client):
+        """Test no exceptions or crashes when feature flag disabled"""
+        from unittest.mock import patch
+
+        with patch('app.config.settings.enable_analyse_text', False):
+            # Should not raise any exceptions
+            try:
+                response = client.post(
+                    "/analyze-text",
+                    json={
+                        "session_id": "123e4567-e89b-12d3-a456-426614174000",
+                        "app_bundle": "com.whatsapp",
+                        "text": "Test message"
+                    }
+                )
+                assert response.status_code == 503
+            except Exception as e:
+                pytest.fail(f"Endpoint should not crash when feature disabled: {e}")
 

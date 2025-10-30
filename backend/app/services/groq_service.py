@@ -144,7 +144,7 @@ async def analyze_text(text: str) -> Dict[str, Any]:
         
         # Call Groq API with timeout
         response = await client.chat.completions.create(
-            model="llama-3.3-70b-versatile",  # Fast and capable Groq model
+            model="llama-3.1-8b-instant",  # Fast and capable Groq model
             messages=[
                 {"role": "system", "content": SCAM_DETECTION_SYSTEM_PROMPT},
                 {"role": "user", "content": text}

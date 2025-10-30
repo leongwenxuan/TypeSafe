@@ -1,0 +1,45 @@
+{
+  "_comment": "Performance baseline metrics for TypeSafe keyboard - Story 10.3",
+  "_note": "Values should be updated when intentional optimizations are made",
+  "_version": "1.1.0",
+  "_date": "2025-10-24",
+  "_regression_threshold": "20% (1.2x baseline)",
+  
+  "comment_key_press": "Key press latency metrics",
+  "keyPressLatency_P50": 10.0,
+  "keyPressLatency_P95": 15.0,
+  "keyPressLatency_P99": 20.0,
+  "typingLatency_withSounds_P95": 12.0,
+  "combined_soundUI_P95": 14.0,
+  
+  "comment_layout": "Layout and UI metrics",
+  "layoutSwitch_time": 45.0,
+  "layoutSwitch_enum": 0.05,
+  "bannerDisplay_time": 90.0,
+  "popoverDisplay_time": 140.0,
+  
+  "comment_memory": "Memory usage metrics (MB)",
+  "memory_startup": 10.0,
+  "memory_normalOperation": 22.0,
+  "memory_after500chars": 1.5,
+  "memory_after1000chars": 2.5,
+  
+  "comment_api": "API and debouncing metrics",
+  "apiDebounce_reductionPercent": 80.0,
+  "apiCall_responseTime": 150.0,
+  "debounce_triggerLatency_P95": 3.0,
+  
+  "comment_frame_rate": "Frame rate and responsiveness",
+  "frameRate_avgFPS": 59.5,
+  "rapidInput_P95": 1.5,
+  
+  "comment_sounds": "Keyboard sound feedback metrics (Epic 11)",
+  "soundTrigger_light_P95": 1.0,
+  "soundTrigger_modifier_P95": 1.0,
+  "soundTrigger_selection_P95": 1.0,
+  "soundTrigger_notification_P95": 1.0,
+  
+  "comment_cpu": "CPU usage",
+  "cpuUsage_avgPercent": 28.0
+}
+

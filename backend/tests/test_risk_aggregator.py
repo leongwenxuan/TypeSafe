@@ -343,6 +343,8 @@ class TestFallbackResponse:
         assert "Test error context" in caplog.text
 
 
+# DISABLED: Analyse Text feature shelved - see docs/EPIC_12_DISABLED_TESTS.md for reactivation
+@pytest.mark.skip(reason="Analyse Text feature shelved - Epic 12")
 class TestTextAnalysisAggregation:
     """Test text analysis convenience function."""
     

@@ -5,10 +5,13 @@
 //  Created by AI Agent on 18/01/25.
 //  Story 2.4: Inline Risk Alert Banners - Integration Tests
 //
+//  DISABLED: Analyse Text feature shelved - see Epic 12 documentation for reactivation steps
+//
 
 import XCTest
 @testable import TypeSafeKeyboard
 
+@available(*, deprecated, message: "Analyse Text feature shelved - Epic 12")
 class KeyboardViewControllerBannerTests: XCTestCase {
     
     // MARK: - Test Properties
@@ -252,11 +255,11 @@ class KeyboardViewControllerBannerTests: XCTestCase {
         // but we can verify the proxy exists and is accessible
     }
     
-    // MARK: - Haptic Feedback Tests
+    // MARK: - Sound Feedback Tests (Epic 11)
     
-    func testHapticFeedbackMediumRisk() {
-        // Note: Haptic feedback cannot be easily unit tested as it requires hardware
-        // This test verifies the method exists and doesn't crash
+    func testSoundFeedbackMediumRisk() {
+        // Note: Sound feedback cannot be easily unit tested without audio hardware
+        // This test verifies the banner display with sound feedback doesn't crash
         
         // Arrange
         let response = AnalyzeTextResponse(
@@ -267,19 +270,19 @@ class KeyboardViewControllerBannerTests: XCTestCase {
         )
         
         // Act & Assert - Should not crash
-        let expectation = XCTestExpectation(description: "Haptic triggered without crash")
+        let expectation = XCTestExpectation(description: "Sound triggered without crash")
         DispatchQueue.main.async {
             self.keyboardVC.perform(Selector(("showAlertBanner:")), with: response)
             expectation.fulfill()
         }
         
         wait(for: [expectation], timeout: 2.0)
-        // If we reach here, haptic didn't crash the app
+        // If we reach here, sound feedback didn't crash the app
     }
     
-    func testHapticFeedbackHighRisk() {
-        // Note: Haptic feedback cannot be easily unit tested as it requires hardware
-        // This test verifies the method exists and doesn't crash
+    func testSoundFeedbackHighRisk() {
+        // Note: Sound feedback cannot be easily unit tested without audio hardware
+        // This test verifies the banner display with sound feedback doesn't crash
         
         // Arrange
         let response = AnalyzeTextResponse(
@@ -290,19 +293,19 @@ class KeyboardViewControllerBannerTests: XCTestCase {
         )
         
         // Act & Assert - Should not crash
-        let expectation = XCTestExpectation(description: "Haptic triggered without crash")
+        let expectation = XCTestExpectation(description: "Sound triggered without crash")
         DispatchQueue.main.async {
             self.keyboardVC.perform(Selector(("showAlertBanner:")), with: response)
             expectation.fulfill()
         }
         
         wait(for: [expectation], timeout: 2.0)
-        // If we reach here, haptic didn't crash the app
+        // If we reach here, sound feedback didn't crash the app
     }
     
-    func testNoHapticWithoutFullAccess() {
+    func testSoundWithoutFullAccess() {
         // Note: hasFullAccess is a system property we can't easily mock
-        // This test verifies the haptic feedback method handles missing Full Access gracefully
+        // This test verifies the sound feedback works regardless of Full Access (sounds always work)
         
         // Arrange
         let response = AnalyzeTextResponse(

@@ -7,7 +7,7 @@ import os
 from typing import List
 
 from pydantic_settings import BaseSettings
-from pydantic import Field, ConfigDict
+from pydantic import Field, ConfigDict, field_validator
 
 
 class Settings(BaseSettings):
@@ -102,7 +102,24 @@ class Settings(BaseSettings):
         alias="EXA_DAILY_BUDGET",
         description="Daily budget limit for Exa API in USD"
     )
-    
+
+    # Feature Flags (Story 12.1)
+    enable_analyse_text: bool = Field(
+        default=False,
+        alias="ENABLE_ANALYSE_TEXT",
+        description="Controls availability of text analysis feature (Story 12.1)"
+    )
+
+    @field_validator("enable_analyse_text", mode="before")
+    @classmethod
+    def validate_enable_analyse_text(cls, v):
+        """Validate ENABLE_ANALYSE_TEXT strictly accepts only 'true' or 'false' strings"""
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            return v.lower() == "true"
+        return False
+
     def validate_required_keys(self) -> None:
         """
         Validate that all required API keys are present.

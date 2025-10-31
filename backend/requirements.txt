@@ -12,7 +12,7 @@ pytest==7.4.3
 pytest-cov==4.1.0
 pytest-asyncio==0.21.1
 httpx==0.26.0  # For testing FastAPI endpoints
-websockets==12.0  # For testing WebSocket endpoints
+websockets>=13.0  # Required by supabase realtime client (using 15.0.1 in venv)
 
 # Additional utilities
 pydantic==2.12.3

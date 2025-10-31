@@ -49,11 +49,11 @@ class ScreenshotNotificationService {
         // Stop any existing timer
         stopPolling()
         
-        print("ScreenshotNotificationService: Starting polling (interval: \(pollingInterval)s)")
+        
         
         // Check if feature is enabled via settings
         guard isScreenshotPromptsEnabled() else {
-            print("ScreenshotNotificationService: Screenshot prompts disabled in settings")
+            
             return
         }
         
@@ -76,21 +76,21 @@ class ScreenshotNotificationService {
         pollingTimer?.invalidate()
         pollingTimer = nil
         isPolling = false
-        print("ScreenshotNotificationService: Stopped polling")
+        
     }
     
     /// Marks a notification as processed to prevent duplicate displays
     /// - Parameter notificationId: ID of the notification to mark
     func markAsProcessed(_ notificationId: String) {
         processedNotificationIds.insert(notificationId)
-        print("ScreenshotNotificationService: Marked notification as processed: \(notificationId)")
+        
     }
     
     /// Clears all processed notification IDs
     /// Useful for testing or when keyboard is dismissed
     func clearProcessedNotifications() {
         processedNotificationIds.removeAll()
-        print("ScreenshotNotificationService: Cleared processed notifications")
+        
     }
     
     // MARK: - Private Methods
@@ -142,10 +142,6 @@ class ScreenshotNotificationService {
     /// Processes a new notification by calling the callback and marking as processed
     /// - Parameter notification: The notification to process
     private func processNewNotification(_ notification: ScreenshotNotification) {
-        print("ScreenshotNotificationService: New screenshot notification detected")
-        print("  - ID: \(notification.id)")
-        print("  - Timestamp: \(notification.timestamp)")
-        print("  - Age: \(String(format: "%.1f", notification.age))s")
         
         // Mark as processed immediately to prevent duplicates
         markAsProcessed(notification.id)
@@ -174,7 +170,6 @@ extension ScreenshotNotificationService {
     func cleanup() {
         stopPolling()
         clearProcessedNotifications()
-        print("ScreenshotNotificationService: Cleaned up resources")
     }
 }
 

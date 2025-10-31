@@ -142,11 +142,9 @@ class ScreenshotAlertBannerView: UIView {
     @objc private func scanButtonTapped() {
         // Story 5.3: Debounce rapid taps
         guard !isScanButtonDisabled else {
-            print("ScreenshotAlertBannerView: Scan button tap ignored - debouncing")
             return
         }
         
-        print("ScreenshotAlertBannerView: Scan Now button tapped")
         
         // Disable button temporarily
         isScanButtonDisabled = true
@@ -165,7 +163,6 @@ class ScreenshotAlertBannerView: UIView {
     }
     
     @objc private func dismissButtonTapped() {
-        print("ScreenshotAlertBannerView: Dismiss button tapped")
         dismissAction()
     }
 }

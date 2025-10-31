@@ -129,14 +129,12 @@ class LinkedInResultsPopoverView: UIView {
     
     // MARK: - Content Configuration
     private func configureContent() {
-        print("🔍 LinkedInResultsPopoverView: Configuring content with \(results.count) results")
         
         // Determine how many results to show initially
         let resultsToShow = min(results.count, maxVisibleResults)
         
         // Add profile cards for visible results
         for (index, profile) in results.prefix(resultsToShow).enumerated() {
-            print("🔍 Adding profile card \(index + 1): \(profile.name)")
             let profileCard = createProfileCard(profile: profile, index: index)
             contentStackView.addArrangedSubview(profileCard)
             
@@ -153,7 +151,6 @@ class LinkedInResultsPopoverView: UIView {
             contentStackView.addArrangedSubview(viewMoreButton)
         }
         
-        print("🔍 Content configuration complete. Stack view has \(contentStackView.arrangedSubviews.count) subviews")
     }
     
     private func createProfileCard(profile: KeyboardAPIService.LinkedInProfile, index: Int) -> UIView {
@@ -161,10 +158,6 @@ class LinkedInResultsPopoverView: UIView {
         cardView.translatesAutoresizingMaskIntoConstraints = false
         cardView.backgroundColor = UIColor.systemBackground
         
-        print("   Creating card for: \(profile.name)")
-        print("   Title: \(profile.title)")
-        print("   Company: \(profile.company)")
-        print("   URL: \(profile.profileUrl)")
         
         // Name label (bold, 16pt)
         let nameLabel = UILabel()
@@ -225,7 +218,6 @@ class LinkedInResultsPopoverView: UIView {
             copyButton.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -8)
         ])
         
-        print("   Card constraints activated")
         return cardView
     }
     

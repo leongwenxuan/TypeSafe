@@ -140,12 +140,10 @@ class PrivacyMessageView: UIView {
     // MARK: - Actions
     
     @objc private func settingsButtonTapped() {
-        print("PrivacyMessageView: Settings button tapped")
         settingsAction?()
     }
     
     @objc private func dismissButtonTapped() {
-        print("PrivacyMessageView: Dismiss button tapped")
         dismissAction?()
     }
     

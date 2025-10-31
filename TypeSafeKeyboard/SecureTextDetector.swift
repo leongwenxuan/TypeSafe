@@ -31,7 +31,6 @@ class SecureTextDetector {
         
         // Log detection for debugging (Story 2.8 requirement)
         if isSecure {
-            print("SecureTextDetector: Secure field detected - skipping text analysis")
         }
         
         return isSecure
@@ -45,26 +44,22 @@ class SecureTextDetector {
         if let contentType = proxy.textContentType,
            let actualContentType = contentType {
             if isPasswordContentType(actualContentType) {
-                print("SecureTextDetector: Detected via content type: \(actualContentType)")
                 return true
             }
         }
         
         // Check 2: Number pad keyboard type (common for PINs and secure codes)
         if proxy.keyboardType == .numberPad {
-            print("SecureTextDetector: Detected number pad (likely PIN field)")
             return true
         }
         
         // Check 3: Phone pad keyboard type (sometimes used for secure entry)
         if proxy.keyboardType == .phonePad {
-            print("SecureTextDetector: Detected phone pad (potentially secure)")
             return true
         }
         
         // Check 4: Context access limitation (heuristic for secure fields)
         if hasLimitedContextAccess(proxy) {
-            print("SecureTextDetector: Limited context access detected (likely secure field)")
             return true
         }
         

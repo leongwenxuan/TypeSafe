@@ -105,13 +105,11 @@ class ScanResultBannerView: UIView {
         containerView.layer.shadowOpacity = 0.1
         containerView.layer.shadowRadius = 4
         
-        print("ScanResultBannerView: Created banner for scan \(scanResult.scanId)")
     }
     
     // MARK: - Actions
     
     @objc private func dismissTapped() {
-        print("ScanResultBannerView: Dismiss button tapped")
         dismissAction()
     }
     

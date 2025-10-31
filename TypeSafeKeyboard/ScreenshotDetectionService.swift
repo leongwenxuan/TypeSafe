@@ -36,7 +36,6 @@ class ScreenshotDetectionService {
     /// Starts polling for new screenshots
     /// - Parameter onDetected: Callback when new screenshot is found
     func startPolling(onScreenshotDetected: @escaping () -> Void) {
-        print("ScreenshotDetectionService: Starting screenshot polling")
         
         self.onScreenshotDetected = onScreenshotDetected
         
@@ -49,7 +48,10 @@ class ScreenshotDetectionService {
             withTimeInterval: pollingInterval,
             repeats: true
         ) { [weak self] _ in
-            self?.checkForNewScreenshot()
+            // Run polling work off the main thread to avoid UI stalls
+            DispatchQueue.global(qos: .utility).async { [weak self] in
+                self?.checkForNewScreenshot()
+            }
         }
         
         // Also check immediately
@@ -58,7 +60,6 @@ class ScreenshotDetectionService {
     
     /// Stops polling for screenshots
     func stopPolling() {
-        print("ScreenshotDetectionService: Stopping screenshot polling")
         pollingTimer?.invalidate()
         pollingTimer = nil
     }
@@ -101,16 +102,14 @@ class ScreenshotDetectionService {
         }
         
         // New screenshot detected!
-        print("🟢 ScreenshotDetectionService: NEW SCREENSHOT DETECTED!")
-        print("   Screenshot date: \(recentScreenshotDate)")
-        print("   Age: \(String(format: "%.1f", age))s")
-        print("   → Triggering automatic background scan...")
         
         // Update last detected
         lastDetectedScreenshotDate = recentScreenshotDate
         
-        // Trigger callback (will launch app silently in background)
-        onScreenshotDetected?()
+        // Trigger callback on the main thread (UI work will happen there)
+        DispatchQueue.main.async { [weak self] in
+            self?.onScreenshotDetected?()
+        }
     }
     
     /// Gets the creation date of the most recent screenshot

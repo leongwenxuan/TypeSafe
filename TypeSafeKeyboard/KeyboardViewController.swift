@@ -20,17 +20,8 @@ class KeyboardViewController: UIInputViewController {
     // MARK: - Properties
     private var keyboardView: UIView!
     private var isShifted = false
-    /// Caps lock state: When true, all letters are uppercase and remain so until toggled
-    /// Separate from isShifted (single character uppercase) to handle persistent vs temporary uppercase
-    private var isCapsLocked = false
     private var currentLayout: KeyboardLayout = .letters
     private var heightConstraint: NSLayoutConstraint?
-
-    // Story 13.1: Double-tap detection for caps lock
-    /// Timestamp of the last shift button tap (used to detect double-tap)
-    private var lastShiftTapTime: TimeInterval = 0
-    /// Double-tap timeout in seconds (0.3s is standard for iOS double-tap recognition)
-    private let doubleTapTimeoutSeconds: TimeInterval = 0.3
     
     // MARK: - Color Constants (Story 6.1)
     // Light mode colors - Apple-like neutral scheme
@@ -42,27 +33,12 @@ class KeyboardViewController: UIInputViewController {
     private let darkKeyBackground = UIColor(white: 0.29, alpha: 1.0)  // #4A4A4A
     private let darkKeyboardBackground = UIColor(white: 0.10, alpha: 1.0)  // #191919
     private let darkTextColor = UIColor.white
-
-    // Story 13.2: Shift button colors for three states (Normal, Shift Active, Caps Lock)
-    // Light mode shift button colors
-    let lightShiftNormalColor = UIColor(white: 0.97, alpha: 1.0)  // #F8F8F8 (same as normal key)
-    let lightShiftActiveColor = UIColor(white: 0.65, alpha: 1.0)  // #A6A6A6 (darker highlight for single shift - more bold)
-    let lightCapsLockColor = UIColor(red: 1.0, green: 0.6, blue: 0.0, alpha: 1.0)  // Orange warning color
-
-    // Dark mode shift button colors
-    let darkShiftNormalColor = UIColor(white: 0.29, alpha: 1.0)  // #4A4A4A (same as normal key)
-    let darkShiftActiveColor = UIColor(white: 0.60, alpha: 1.0)  // #999999 (darker highlight for single shift - more bold)
-    let darkCapsLockColor = UIColor(red: 1.0, green: 0.6, blue: 0.0, alpha: 1.0)  // Orange warning color (same across themes for emphasis)
-
+    
     // Performance optimization caches (Story 2.9)
     private var cachedShiftButton: UIButton?
     private var cachedKeyboardAppearance: UIKeyboardAppearance?
     private var layoutCache: [KeyboardLayout: UIView] = [:]
-
-    // Story 13.6: Long-press delete acceleration
-    private var deleteRepeatTimer: Timer?
-    private var isDeletePressed = false
-
+    
     // Snippet management (Story 2.2)
     private let snippetManager = TextSnippetManager()
     private let secureDetector = SecureTextDetector()
@@ -70,22 +46,10 @@ class KeyboardViewController: UIInputViewController {
     // Backend API integration (Story 2.3)
     private let apiService = APIService()
     
-    // Performance optimization: Debounced analyzer (Story 10.1)
-    // Story 12.2: Conditionally initialized based on feature flag
-    private lazy var debouncedAnalyzer: DebouncedAnalyzer? = {
-        guard FeatureFlags.shared.isAnalyseTextEnabled else {
-            print("KeyboardViewController: DebouncedAnalyzer not initialized - feature disabled")
-            return nil
-        }
-        return DebouncedAnalyzer(apiService: apiService)
-    }()
-    
-    // Keyboard sound feedback service (Story 11.2)
-    private let soundService = KeyboardSoundService.shared
-    
     // Banner management (Story 2.4)
     private var currentBanner: UIView?
     private var autoDismissTimer: Timer?
+    private var feedbackGenerator: UIImpactFeedbackGenerator?
     
     // Popover management (Story 2.6)
     private var currentPopover: ExplainWhyPopoverView?
@@ -151,8 +115,11 @@ class KeyboardViewController: UIInputViewController {
         
         setupKeyboard()
         
-        // Story 11.2: Prepare keyboard sound service
-        soundService.prepare()
+        // Initialize haptic feedback generator if Full Access enabled (Story 2.4)
+        if hasFullAccessPermission {
+            feedbackGenerator = UIImpactFeedbackGenerator()
+            feedbackGenerator?.prepare()
+        }
         
         // Start scan result polling (Story 3.7)
         startScanResultPolling()
@@ -192,13 +159,6 @@ class KeyboardViewController: UIInputViewController {
         
         // Stop direct screenshot detection (Story 5.3)
         screenshotDetectionService?.stopPolling()
-
-        // Performance optimization: Cancel pending analysis (Story 10.1)
-        // Story 12.2: Safe optional unwrapping
-        debouncedAnalyzer?.cancelPending()
-
-        // Story 11.2: Cleanup sound service
-        soundService.cleanup()
     }
     
     override func didReceiveMemoryWarning() {
@@ -206,14 +166,6 @@ class KeyboardViewController: UIInputViewController {
         // Performance optimization: Clear caches on memory warning (Story 2.9)
         clearPerformanceCaches()
         print("KeyboardViewController: Memory warning - cleared performance caches")
-
-        // Performance optimization: Cancel pending analysis and release memory (Story 10.1)
-        // Story 12.2: Safe optional unwrapping
-        debouncedAnalyzer?.cancelPending()
-        snippetManager.clearAndReleaseMemory()
-        
-        // Story 11.2: Cleanup sound service on memory warning
-        soundService.cleanup()
         
         // Immediately clean up WebSocket to free memory
         webSocketManager?.disconnect()
@@ -239,10 +191,6 @@ class KeyboardViewController: UIInputViewController {
         
         // Dismiss banner on field change to prevent context leakage (Story 2.4)
         dismissBanner(animated: true)
-
-        // Performance optimization: Cancel pending analysis on field change (Story 10.1)
-        // Story 12.2: Safe optional unwrapping
-        debouncedAnalyzer?.cancelPending()
     }
     
     // MARK: - Setup
@@ -341,8 +289,9 @@ class KeyboardViewController: UIInputViewController {
     @objc private func scanNowTapped() {
         print("🟢 Scan Now tapped")
         
-        // Story 11.3: Play modifier sound for button interaction
-        soundService.playModifier()
+        // Haptic feedback
+        let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
+        feedbackGenerator.impactOccurred()
         
         // Show helpful banner prompting user to take screenshot
         showScanInstructionBanner()
@@ -394,8 +343,9 @@ class KeyboardViewController: UIInputViewController {
     @objc private func settingsTapped() {
         print("🟢 Settings tapped - opening companion app")
         
-        // Story 11.3: Play light sound for settings button
-        soundService.playLight()
+        // Haptic feedback
+        let feedbackGenerator = UIImpactFeedbackGenerator(style: .light)
+        feedbackGenerator.impactOccurred()
         
         // Open companion app (TypeSafe URL scheme)
         if let url = URL(string: "typesafe://settings") {
@@ -486,23 +436,23 @@ class KeyboardViewController: UIInputViewController {
         mainStackView.spacing = 4  // Story 6.2: Increased from 3pt to 4pt
         mainStackView.translatesAutoresizingMaskIntoConstraints = false
         keyboardView.addSubview(mainStackView)
-
+        
         NSLayoutConstraint.activate([
             mainStackView.leftAnchor.constraint(equalTo: keyboardView.leftAnchor, constant: 4),  // Story 6.2: Increased from 3pt to 4pt
             mainStackView.rightAnchor.constraint(equalTo: keyboardView.rightAnchor, constant: -4),
             mainStackView.topAnchor.constraint(equalTo: keyboardView.topAnchor, constant: 4),
             mainStackView.bottomAnchor.constraint(equalTo: keyboardView.bottomAnchor, constant: -4)
         ])
-
-        // Row 1: q w e r t y u i o p (Story 13.6: Changed to lowercase - will be updated by shift/caps lock state)
-        let row1 = createKeyRow(keys: ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"])
+        
+        // Row 1: Q W E R T Y U I O P
+        let row1 = createKeyRow(keys: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"])
         row1.heightAnchor.constraint(equalToConstant: 46).isActive = true  // Story 6.2: Increased from 38pt to 46pt
         mainStackView.addArrangedSubview(row1)
-
-        // Row 2: a s d f g h j k l (with side padding) (Story 13.6: Changed to lowercase - will be updated by shift/caps lock state)
+        
+        // Row 2: A S D F G H J K L (with side padding)
         let row2Container = UIView()
         row2Container.heightAnchor.constraint(equalToConstant: 46).isActive = true  // Story 6.2: Increased from 38pt to 46pt
-        let row2 = createKeyRow(keys: ["a", "s", "d", "f", "g", "h", "j", "k", "l"])
+        let row2 = createKeyRow(keys: ["A", "S", "D", "F", "G", "H", "J", "K", "L"])
         row2.translatesAutoresizingMaskIntoConstraints = false
         row2Container.addSubview(row2)
         
@@ -693,30 +643,24 @@ class KeyboardViewController: UIInputViewController {
         let stackView = UIStackView()
         stackView.axis = .horizontal
         stackView.spacing = 4 // Reduced spacing
-
+        
         // Shift button
         let shiftButton = createKeyButton(title: "⇧", action: #selector(shiftTapped))
         stackView.addArrangedSubview(shiftButton)
-
-        // Letter keys (Story 13.6: Changed to lowercase - will be updated by shift/caps lock state)
-        let letterKeys = createKeyRow(keys: ["z", "x", "c", "v", "b", "n", "m"])
+        
+        // Letter keys
+        let letterKeys = createKeyRow(keys: ["Z", "X", "C", "V", "B", "N", "M"])
         stackView.addArrangedSubview(letterKeys)
         
         // Backspace button
         let backspaceButton = createKeyButton(title: "⌫", action: #selector(backspaceTapped))
-
-        // Story 13.6: Add long-press gesture for accelerated delete
-        let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(backspacePressed(_:)))
-        longPressGesture.minimumPressDuration = 0.5  // Start after 0.5 seconds
-        backspaceButton.addGestureRecognizer(longPressGesture)
-
         stackView.addArrangedSubview(backspaceButton)
-
+        
         // Set width constraints after adding to stack view
         shiftButton.widthAnchor.constraint(equalTo: backspaceButton.widthAnchor).isActive = true
         shiftButton.widthAnchor.constraint(equalToConstant: 45).isActive = true // Slightly smaller
         backspaceButton.widthAnchor.constraint(equalToConstant: 45).isActive = true
-
+        
         return stackView
     }
     
@@ -798,15 +742,15 @@ class KeyboardViewController: UIInputViewController {
             mainStackView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -4)
         ])
         
-        // Row 1: q w e r t y u i o p (Story 13.6: Changed to lowercase - will be updated by shift/caps lock state)
-        let row1 = createKeyRow(keys: ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"])
+        // Row 1: Q W E R T Y U I O P
+        let row1 = createKeyRow(keys: ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"])
         row1.heightAnchor.constraint(equalToConstant: 46).isActive = true  // Story 6.2: Increased from 38pt to 46pt
         mainStackView.addArrangedSubview(row1)
-
-        // Row 2: a s d f g h j k l (with side padding) (Story 13.6: Changed to lowercase - will be updated by shift/caps lock state)
+        
+        // Row 2: A S D F G H J K L (with side padding)
         let row2Container = UIView()
         row2Container.heightAnchor.constraint(equalToConstant: 46).isActive = true  // Story 6.2: Increased from 38pt to 46pt
-        let row2 = createKeyRow(keys: ["a", "s", "d", "f", "g", "h", "j", "k", "l"])
+        let row2 = createKeyRow(keys: ["A", "S", "D", "F", "G", "H", "J", "K", "L"])
         row2.translatesAutoresizingMaskIntoConstraints = false
         row2Container.addSubview(row2)
         
@@ -1079,17 +1023,13 @@ class KeyboardViewController: UIInputViewController {
     
     // MARK: - Actions
     @objc private func keyTapped(_ sender: UIButton) {
-        // Story 11.3: Play light click sound for standard keys
-        soundService.playLight()
-        
         // Performance optimization: Fast path for key insertion (Story 2.9)
         guard let key = sender.title(for: .normal) else { return }
         
-        // Story 13.4: Optimize character processing with caps lock support
+        // Optimize character processing for minimal latency
         let character: String
         if currentLayout == .letters {
-            // Apply uppercase if either shift or caps lock is active
-            character = (isShifted || isCapsLocked) ? key.uppercased() : key.lowercased()
+            character = isShifted ? key.uppercased() : key.lowercased()
         } else {
             character = key
         }
@@ -1097,131 +1037,32 @@ class KeyboardViewController: UIInputViewController {
         // Insert text immediately for best responsiveness
         textDocumentProxy.insertText(character)
         
-        // Process character for snippet analysis (already optimized with debouncing)
-        processCharacterForSnippet(character)
-        
-        // Auto-disable shift after typing one character (only for letter layout and only if NOT caps locked)
-        // Story 13.1: Preserve caps lock state across character input
-        if currentLayout == .letters && isShifted && !isCapsLocked {
-            isShifted = false
-            updateShiftStateOptimized()
-        }
-    }
-
-    // Story 13.1: Detect single vs double-tap for shift/caps lock
-    /// Detects whether a tap on the shift button is a single-tap or double-tap.
-    /// Returns true if this is a double-tap (within doubleTapTimeoutSeconds of the last tap).
-    /// Updates lastShiftTapTime to track the timing.
-    private func detectShiftDoubleTap() -> Bool {
-        let currentTime = Date().timeIntervalSince1970
-        let timeSinceLastTap = currentTime - lastShiftTapTime
-
-        let isDoubleTap = timeSinceLastTap <= doubleTapTimeoutSeconds && lastShiftTapTime > 0
-
-        // Update tap time for next detection
-        lastShiftTapTime = currentTime
-
-        return isDoubleTap
-    }
-
-    // Story 13.1 & 13.3: Handle caps lock state transitions
-    /// Updates caps lock state on double-tap of shift button.
-    /// - When caps lock is toggled ON: isCapsLocked = true, isShifted = true (to uppercase first character)
-    /// - When caps lock is toggled OFF: isCapsLocked = false, isShifted reverts to previous state
-    /// Ensures caps lock and shift states don't overlap unexpectedly.
-    private func updateCapsLockState() {
-        if isCapsLocked {
-            // Turn caps lock off
-            isCapsLocked = false
-            // Note: Don't force isShifted = false here, as the user may have shift enabled separately
-            // The shift state will be maintained independently
-        } else {
-            // Turn caps lock on and show it with shifted appearance
-            isCapsLocked = true
-            isShifted = true  // Ensure shifted appearance for first character
-        }
-        updateShiftState()
-    }
-
-    @objc private func shiftTapped() {
-        // Story 11.3: Play modifier sound for shift key (immediate feedback)
-        soundService.playModifier()
-
-        // Story 13.3: Detect double-tap for caps lock, single-tap for shift
-        let isDoubleTap = detectShiftDoubleTap()
-
-        if isDoubleTap {
-            // Story 13.3: Double-tap toggles caps lock
-            updateCapsLockState()
-
-            // Story 13.6: Provide distinct haptic feedback for caps lock (medium/heavy impact)
-            let impactGenerator = UIImpactFeedbackGenerator(style: .medium)
-            impactGenerator.impactOccurred()
-
-            // Optional: Consider different sound for caps lock (could be added to UX review)
-            // soundService.playModifier()  // Or a distinct sound
-        } else {
-            // Story 13.3: Single-tap toggles shift mode
-            isShifted.toggle()
-
-            // Story 13.3: If enabling shift, disable caps lock (single shift takes priority)
-            if isShifted && isCapsLocked {
-                isCapsLocked = false
+        // Defer non-critical operations to avoid blocking UI
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            // Snippet management (Story 2.2) - deferred for performance
+            self.processCharacterForSnippet(character)
+            
+            // Auto-disable shift after typing one character (only for letter layout)
+            if self.currentLayout == .letters && self.isShifted {
+                self.isShifted = false
+                self.updateShiftStateOptimized()
             }
-
-            // Story 13.6: Provide light haptic feedback for single-tap shift
-            let selectionGenerator = UISelectionFeedbackGenerator()
-            selectionGenerator.selectionChanged()
-
-            // Story 13.6: Update UI with debouncing on rapid taps
-            updateShiftStateOptimized()
         }
+    }
+    
+    @objc private func shiftTapped() {
+        isShifted.toggle()
+        updateShiftState()
     }
     
     private func updateShiftState() {
         guard let keyboardView = keyboardView else { return }
-
+        
         // Update shift button appearance to indicate state
         if let mainStackView = keyboardView.subviews.first as? UIStackView {
             updateShiftButton(in: mainStackView)
-        }
-
-        // Story 13.6: Update all letter buttons to reflect current case
-        updateLetterButtonCasing(in: keyboardView)
-    }
-
-    // Story 13.6: Update all letter button display to show correct case
-    private func updateLetterButtonCasing(in view: UIView) {
-        for subview in view.subviews {
-            if let stackView = subview as? UIStackView {
-                // Recursively update stack views
-                updateLetterButtonCasing(in: stackView)
-            } else if let button = subview as? UIButton {
-                // Update button directly
-                updateLetterButtonDisplay(button)
-            } else {
-                // Handle container views that might have buttons inside
-                updateLetterButtonCasing(in: subview)
-            }
-        }
-    }
-
-    // Story 13.6: Update a single button's display based on current case state
-    private func updateLetterButtonDisplay(_ button: UIButton) {
-        guard let currentTitle = button.title(for: .normal) else { return }
-
-        // Skip non-letter buttons (shift, backspace, space, return, etc.)
-        let isLetterButton = currentTitle.count == 1 && currentTitle.allSatisfy { $0.isLetter }
-        guard isLetterButton else { return }
-
-        // Calculate desired case
-        let shouldBeUppercase = (isShifted || isCapsLocked)
-        let currentIsUppercase = currentTitle == currentTitle.uppercased()
-
-        // Only update if the case needs to change (avoid unnecessary updates)
-        if shouldBeUppercase != currentIsUppercase {
-            let newTitle = shouldBeUppercase ? currentTitle.uppercased() : currentTitle.lowercased()
-            button.setTitle(newTitle, for: .normal)
         }
     }
     
@@ -1234,11 +1075,6 @@ class KeyboardViewController: UIInputViewController {
             // Fallback to full search and cache the result
             updateShiftState()
         }
-
-        // Update letter button casing - the optimization in updateLetterButtonDisplay()
-        // ensures we only update buttons that actually need case change
-        guard let keyboardView = keyboardView else { return }
-        updateLetterButtonCasing(in: keyboardView)
     }
     
     private func updateShiftButton(in stackView: UIStackView) {
@@ -1259,135 +1095,28 @@ class KeyboardViewController: UIInputViewController {
         }
     }
     
-    // Story 13.2: Helper method to get shift button styling based on state
-    func getShiftButtonStyle() -> (backgroundColor: UIColor, borderColor: UIColor?, borderWidth: CGFloat, textColor: UIColor) {
-        let isDark = textDocumentProxy.keyboardAppearance == .dark
-
-        // Determine state priority: Caps Lock > Shift Active > Normal
-        if isCapsLocked {
-            // Caps Lock state: Orange/warning color with emphasis
-            let bgColor = isDark ? darkCapsLockColor : lightCapsLockColor
-            let textColor = UIColor.white  // White text on orange for contrast
-            let borderColor = isDark ? darkCapsLockColor.withAlphaComponent(0.8) : lightCapsLockColor.withAlphaComponent(0.8)
-            return (backgroundColor: bgColor, borderColor: borderColor, borderWidth: 2.0, textColor: textColor)
-        } else if isShifted {
-            // Shift Active state: Lighter/highlighted appearance
-            let bgColor = isDark ? darkShiftActiveColor : lightShiftActiveColor
-            let textColor = isDark ? darkTextColor : lightTextColor
-            return (backgroundColor: bgColor, borderColor: nil, borderWidth: 0, textColor: textColor)
-        } else {
-            // Normal state: Default appearance
-            let bgColor = isDark ? darkShiftNormalColor : lightShiftNormalColor
-            let textColor = isDark ? darkTextColor : lightTextColor
-            return (backgroundColor: bgColor, borderColor: nil, borderWidth: 0, textColor: textColor)
-        }
-    }
-
-    // Optimized method to update a single shift button (Story 2.9 + Story 13.2)
+    // Optimized method to update a single shift button (Story 2.9)
     private func updateSingleShiftButton(_ button: UIButton) {
-        let style = getShiftButtonStyle()
-
-        // Apply background color
-        button.backgroundColor = style.backgroundColor
-
-        // Apply border styling
-        if let borderColor = style.borderColor {
-            button.layer.borderColor = borderColor.cgColor
-            button.layer.borderWidth = style.borderWidth
-        } else {
-            button.layer.borderColor = UIColor.clear.cgColor
-            button.layer.borderWidth = 0
-        }
-
-        // Apply text color
-        button.setTitleColor(style.textColor, for: .normal)
-
-        // Story 13.2: Add visual indicator for caps lock (optional "⇪" symbol)
-        if isCapsLocked {
-            button.setTitle("⇪", for: .normal)  // Caps lock symbol
-        } else {
-            button.setTitle("⇧", for: .normal)  // Shift symbol
-        }
-
-        // Story 13.6: Update accessibility labels
-        updateShiftButtonAccessibility(button)
-    }
-
-    // Story 13.6: Configure accessibility labels for shift button
-    private func updateShiftButtonAccessibility(_ button: UIButton) {
-        button.isAccessibilityElement = true
-
-        if isCapsLocked {
-            // Caps lock state
-            button.accessibilityLabel = "Caps lock enabled"
-            button.accessibilityHint = "All characters will be uppercase. Double-tap to disable."
-            button.accessibilityValue = "on"
-        } else if isShifted {
-            // Shift active state
-            button.accessibilityLabel = "Shift active"
-            button.accessibilityHint = "Next character will be uppercase. Tap again to disable, or double-tap for caps lock."
-            button.accessibilityValue = "on"
-        } else {
-            // Normal state
-            button.accessibilityLabel = "Shift"
-            button.accessibilityHint = "Tap to make the next character uppercase. Double-tap to enable caps lock."
-            button.accessibilityValue = "off"
-        }
+        let isDark = textDocumentProxy.keyboardAppearance == .dark
+        
+        // Story 6.1: Use color constants, with slight modification for shifted state
+        let normalColor = isDark ? darkKeyBackground : lightKeyBackground
+        let shiftedColor = isDark ? UIColor(white: 0.5, alpha: 1.0) : UIColor(white: 0.8, alpha: 1.0)
+        
+        button.backgroundColor = isShifted ? shiftedColor : normalColor
     }
     
     @objc private func backspaceTapped() {
-        // Story 11.3: Play modifier sound for backspace key
-        soundService.playModifier()
-
         textDocumentProxy.deleteBackward()
-
+        
         // Update snippet buffer (Story 2.2)
         let wasModified = snippetManager.deleteLastCharacter()
         if wasModified {
             print("KeyboardViewController: Snippet buffer updated after backspace")
         }
     }
-
-    // Story 13.6: Handle long-press delete for acceleration
-    @objc private func backspacePressed(_ gesture: UILongPressGestureRecognizer) {
-        switch gesture.state {
-        case .began:
-            // Start the repeat timer for accelerated deletion
-            isDeletePressed = true
-            deleteRepeatTimer?.invalidate()
-
-            // Initial delay before repeating starts (0.5 seconds)
-            deleteRepeatTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-                self?.performDelete()
-            }
-
-        case .cancelled, .ended, .failed:
-            // Stop the repeat timer
-            isDeletePressed = false
-            deleteRepeatTimer?.invalidate()
-            deleteRepeatTimer = nil
-
-        default:
-            break
-        }
-    }
-
-    // Story 13.6: Perform a single delete operation
-    private func performDelete() {
-        soundService.playModifier()
-        textDocumentProxy.deleteBackward()
-
-        // Update snippet buffer (Story 2.2)
-        let wasModified = snippetManager.deleteLastCharacter()
-        if wasModified {
-            print("KeyboardViewController: Snippet buffer updated after accelerated backspace")
-        }
-    }
-
+    
     @objc private func spaceTapped() {
-        // Story 11.3: Play modifier sound for space key
-        soundService.playModifier()
-        
         textDocumentProxy.insertText(" ")
         
         // Snippet management (Story 2.2)
@@ -1395,16 +1124,10 @@ class KeyboardViewController: UIInputViewController {
     }
     
     @objc private func returnTapped() {
-        // Story 11.3: Play modifier sound for return key
-        soundService.playModifier()
-        
         textDocumentProxy.insertText("\n")
     }
     
     @objc private func numberModeTapped() {
-        // Story 11.3: Play modifier sound for layout switch
-        soundService.playModifier()
-        
         currentLayout = .numbers
         createKeyboardLayout()
         updateAppearance()
@@ -1412,9 +1135,6 @@ class KeyboardViewController: UIInputViewController {
     }
     
     @objc private func symbolModeTapped() {
-        // Story 11.3: Play modifier sound for layout switch
-        soundService.playModifier()
-        
         currentLayout = .symbols
         createKeyboardLayout()
         updateAppearance()
@@ -1422,9 +1142,6 @@ class KeyboardViewController: UIInputViewController {
     }
     
     @objc private func letterModeTapped() {
-        // Story 11.3: Play modifier sound for layout switch
-        soundService.playModifier()
-        
         currentLayout = .letters
         createKeyboardLayout()
         updateAppearance()
@@ -1436,11 +1153,6 @@ class KeyboardViewController: UIInputViewController {
     /// Processes a typed character for snippet capture and analysis triggering
     /// - Parameter character: The character that was typed
     private func processCharacterForSnippet(_ character: String) {
-        // Story 12.2: Skip text analysis when feature disabled
-        guard FeatureFlags.shared.isAnalyseTextEnabled else {
-            return
-        }
-
         // Story 2.8: Skip text capture when Full Access is disabled (graceful degradation)
         guard hasFullAccessPermission else {
             return
@@ -1467,12 +1179,6 @@ class KeyboardViewController: UIInputViewController {
     /// Sends text snippet to backend for scam analysis
     /// - Parameter text: Text content to analyze
     private func analyzeSnippet(_ text: String) {
-        // Story 12.2: Skip analysis when feature disabled
-        guard FeatureFlags.shared.isAnalyseTextEnabled else {
-            print("KeyboardViewController: Text analysis disabled via feature flag")
-            return
-        }
-
         // Story 2.8: Check Full Access permission before making API calls
         guard hasFullAccessPermission else {
             print("KeyboardViewController: API call skipped - Full Access required")
@@ -1481,10 +1187,8 @@ class KeyboardViewController: UIInputViewController {
         
         // Story 2.7: Update analysis timestamp
         sharedStorageManager.updateLastAnalysisTimestamp()
-
-        // Performance optimization: Use debounced analyzer (Story 10.1)
-        // Story 12.2: Safe optional unwrapping (nil when feature disabled)
-        debouncedAnalyzer?.analyzeText(text) { result in
+        
+        apiService.analyzeText(text: text) { result in
             switch result {
             case .success(let response):
                 print("KeyboardViewController: Received analysis result")
@@ -1518,12 +1222,6 @@ class KeyboardViewController: UIInputViewController {
     /// Displays alert banner for medium or high risk detections
     /// - Parameter response: API response containing risk analysis
     private func showAlertBanner(for response: AnalyzeTextResponse) {
-        // Story 12.2: Do not show banners when feature disabled
-        guard FeatureFlags.shared.isAnalyseTextEnabled else {
-            print("KeyboardViewController: Banners disabled - feature shelved")
-            return
-        }
-
         // Story 2.7: Check alert preferences from shared storage
         let alertPreferences = sharedStorageManager.getAlertPreferences()
         
@@ -1563,8 +1261,8 @@ class KeyboardViewController: UIInputViewController {
             // Determine risk level
             let riskLevel: RiskLevel = response.risk_level == "high" ? .high : .medium
             
-            // Trigger sound feedback
-            self.triggerSoundFeedback(for: riskLevel)
+            // Trigger haptic feedback
+            self.triggerHapticFeedback(for: riskLevel)
             
             // Create new banner
             let banner = RiskAlertBannerView(
@@ -1643,14 +1341,31 @@ class KeyboardViewController: UIInputViewController {
         }
     }
     
-    /// Triggers sound feedback based on risk level (Epic 11)
+    /// Triggers haptic feedback based on risk level
     /// - Parameter riskLevel: The risk level (medium or high)
-    private func triggerSoundFeedback(for riskLevel: RiskLevel) {
-        // Epic 11: Play notification sound for scan results
-        let soundType: UINotificationFeedbackGenerator.FeedbackType = riskLevel == .high ? .warning : .success
-        soundService.playNotification(soundType)
+    private func triggerHapticFeedback(for riskLevel: RiskLevel) {
+        // Only trigger haptic if Full Access is enabled
+        guard hasFullAccessPermission else {
+            print("KeyboardViewController: Haptic skipped (Full Access required)")
+            return
+        }
         
-        print("KeyboardViewController: Notification sound triggered (\(soundType == .warning ? "warning" : "success"))")
+        // Story 2.7: Check haptic preferences from shared storage
+        let alertPreferences = sharedStorageManager.getAlertPreferences()
+        guard alertPreferences.enableHapticFeedback else {
+            print("KeyboardViewController: Haptic feedback disabled in preferences")
+            return
+        }
+        
+        // Select impact style based on risk level
+        let style: UIImpactFeedbackGenerator.FeedbackStyle = riskLevel == .high ? .heavy : .medium
+        
+        // Create generator with appropriate style
+        let generator = UIImpactFeedbackGenerator(style: style)
+        generator.prepare()
+        generator.impactOccurred()
+        
+        print("KeyboardViewController: Haptic feedback triggered (\(style))")
     }
     
     // MARK: - Popover Management (Story 2.6)
@@ -1658,12 +1373,6 @@ class KeyboardViewController: UIInputViewController {
     /// Shows the explain why popover with response details
     /// - Parameter response: The AnalyzeTextResponse containing risk details
     private func showExplainWhyPopover(for response: AnalyzeTextResponse) {
-        // Story 12.3: Do not show popover when feature disabled
-        guard FeatureFlags.shared.isAnalyseTextEnabled else {
-            print("KeyboardViewController: Explain why popover disabled - feature shelved")
-            return
-        }
-
         // Dismiss any existing popover first
         dismissExplainWhyPopover()
         
@@ -2271,14 +1980,17 @@ class KeyboardViewController: UIInputViewController {
         // Auto-dismiss after 20 seconds (longer for result reading)
         startBannerAutoDismissTimer(duration: 20.0)
         
-        // Story 11.3: Play notification sound for screenshot scan results
+        // Haptic feedback
+        let feedbackGenerator = UINotificationFeedbackGenerator()
+        feedbackGenerator.prepare()
+        
         switch riskLevel.lowercased() {
         case "high":
-            soundService.playNotification(.warning)
+            feedbackGenerator.notificationOccurred(.warning)
         case "medium":
-            soundService.playNotification(.warning)
+            feedbackGenerator.notificationOccurred(.warning)
         case "low":
-            soundService.playNotification(.success)
+            feedbackGenerator.notificationOccurred(.success)
         default:
             break
         }
@@ -2293,9 +2005,6 @@ class KeyboardViewController: UIInputViewController {
     @objc private func bannerTappedToViewDetails() {
         print("🟢🟢🟢 BANNER TAP DETECTED!")
         
-        // Story 11.3: Play selection sound for UI interaction
-        soundService.playSelection()
-        
         guard let response = currentAnalysisResponse else {
             print("🔴 No analysis response stored")
             return
@@ -2305,7 +2014,9 @@ class KeyboardViewController: UIInputViewController {
         print("   Risk: \(response.riskLevel ?? "nil")")
         print("   Explanation: \(response.explanation ?? "nil")")
         
-        // Note: Sound already played at line 2037 when banner was tapped
+        // Haptic feedback
+        let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
+        feedbackGenerator.impactOccurred()
         
         // Show detailed explanation
         showAnalysisDetails(response: response)

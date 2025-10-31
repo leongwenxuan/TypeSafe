@@ -5,13 +5,10 @@
 //  Created by AI Agent on 18/01/25.
 //  Story 2.6: "Explain Why" Popover Detail - Unit Tests
 //
-//  DISABLED: Analyse Text feature shelved - see Epic 12 documentation for reactivation steps
-//
 
 import XCTest
 @testable import TypeSafeKeyboard
 
-@available(*, deprecated, message: "Analyse Text feature shelved - Epic 12")
 class ExplainWhyPopoverViewTests: XCTestCase {
     
     // MARK: - Test Properties

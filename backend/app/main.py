@@ -227,34 +227,22 @@ async def add_security_headers(request: Request, call_next: Callable):
 async def analyze_text(request: AnalyzeTextRequest, req: Request):
     """
     Analyze text snippet for scam risk using AI providers.
-
+    
     This endpoint receives text from the iOS keyboard extension, analyzes it
     for scam risk using Groq, stores the result in Supabase, and returns
     a normalized risk assessment.
-
+    
     Args:
         request: Request body with session_id, app_bundle, and text
         req: FastAPI Request object for accessing request_id
-
+    
     Returns:
         AnalyzeTextResponse with risk_level, confidence, category, explanation, and timestamp
-
+    
     Raises:
         HTTPException 400: Invalid input (malformed UUID, empty text, etc.)
         HTTPException 500: Service error (Groq failure, database error)
-        HTTPException 503: Feature unavailable (text analysis feature disabled)
     """
-    # Story 12.4: Feature flag check at very start
-    if not settings.enable_analyse_text:
-        logger.info(
-            f"Analyse Text feature disabled - rejecting request from {req.client.host} "
-            f"session_id={request.session_id}"
-        )
-        raise HTTPException(
-            status_code=503,
-            detail="Text analysis feature is temporarily unavailable"
-        )
-
     request_id = getattr(req.state, 'request_id', 'unknown')
     
     try:

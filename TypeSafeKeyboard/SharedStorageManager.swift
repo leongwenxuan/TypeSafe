@@ -56,12 +56,6 @@ class SharedStorageManager {
         
         // Story 4.2: Screenshot Scan Prompts Key
         static let screenshotScanPromptsEnabled = "screenshot_scan_prompts_enabled"
-        
-        // Story 11.4: Keyboard Sounds Key
-        static let keyboardSoundsEnabled = "keyboard_sounds_enabled"
-
-        // Story 12.1: Feature Flag Keys
-        static let featureFlagPrefix = "feature_flag_"
     }
     
     // MARK: - Data Models
@@ -87,10 +81,12 @@ class SharedStorageManager {
     /// User alert preferences
     struct AlertPreferences: Codable {
         let showBanners: Bool
+        let enableHapticFeedback: Bool
         let riskThreshold: String  // "low", "medium", "high"
         
         static let `default` = AlertPreferences(
             showBanners: true,
+            enableHapticFeedback: true,
             riskThreshold: "medium"
         )
     }
@@ -580,118 +576,5 @@ class SharedStorageManager {
     func setScreenshotScanPromptsEnabled(_ enabled: Bool) {
         sharedDefaults?.set(enabled, forKey: Keys.screenshotScanPromptsEnabled)
         print("SharedStorageManager: Screenshot scan prompts \(enabled ? "enabled" : "disabled")")
-    }
-    
-    // MARK: - Keyboard Sounds Settings Methods (Story 11.4)
-    
-    /// Gets whether keyboard sounds are enabled (default: true)
-    /// - Returns: True if keyboard sounds should play (default: true)
-    func getKeyboardSoundsEnabled() -> Bool {
-        guard sharedDefaults != nil else {
-            print("⚠️ SharedStorageManager: sharedDefaults is nil, returning default (true)")
-            return true
-        }
-        
-        // If never set, return default (true)
-        if sharedDefaults?.object(forKey: Keys.keyboardSoundsEnabled) == nil {
-            return true
-        }
-        
-        let enabled = sharedDefaults?.bool(forKey: Keys.keyboardSoundsEnabled) ?? true
-        print("📱 SharedStorageManager: Keyboard sounds preference - \(enabled ? "enabled" : "disabled")")
-        return enabled
-    }
-    
-    /// Sets whether keyboard sounds are enabled
-    /// - Parameter enabled: Whether keyboard sounds should play
-    func setKeyboardSoundsEnabled(_ enabled: Bool) {
-        guard sharedDefaults != nil else {
-            print("⚠️ SharedStorageManager: sharedDefaults is nil, cannot save preference")
-            return
-        }
-        
-        sharedDefaults?.set(enabled, forKey: Keys.keyboardSoundsEnabled)
-        sharedDefaults?.synchronize()  // Force immediate save
-        print("💾 SharedStorageManager: Keyboard sounds \(enabled ? "enabled" : "disabled")")
-        
-        // Post notification for KeyboardSoundService
-        NotificationCenter.default.post(
-            name: .keyboardSoundsPreferenceChanged,
-            object: enabled
-        )
-        print("📢 SharedStorageManager: Posted keyboardSoundsPreferenceChanged notification")
-    }
-
-    // MARK: - Feature Flag Methods (Story 12.1)
-
-    /// Gets feature flag enabled state
-    /// - Parameter key: Feature flag identifier (e.g., "analyse_text")
-    /// - Returns: True if feature is enabled, false if disabled
-    func getFeatureFlagEnabled(_ key: String) -> Bool {
-        let storageKey = Keys.featureFlagPrefix + key
-
-        // Default to false for all features (disabled by default)
-        guard sharedDefaults != nil else {
-            print("⚠️ SharedStorageManager: sharedDefaults is nil, returning default (false)")
-            return false
-        }
-
-        // If never set, return default (false)
-        if sharedDefaults?.object(forKey: storageKey) == nil {
-            print("📱 SharedStorageManager: Feature flag '\(key)' not set, returning default (false)")
-            return false
-        }
-
-        let enabled = sharedDefaults?.bool(forKey: storageKey) ?? false
-        print("📱 SharedStorageManager: Feature flag '\(key)' - \(enabled ? "enabled" : "disabled")")
-        return enabled
-    }
-
-    /// Sets feature flag enabled state
-    /// - Parameters:
-    ///   - key: Feature flag identifier (e.g., "analyse_text")
-    ///   - enabled: Whether feature should be enabled
-    func setFeatureFlagEnabled(_ key: String, _ enabled: Bool) {
-        let storageKey = Keys.featureFlagPrefix + key
-
-        guard sharedDefaults != nil else {
-            print("⚠️ SharedStorageManager: sharedDefaults is nil, cannot save feature flag '\(key)'")
-            return
-        }
-
-        sharedDefaults?.set(enabled, forKey: storageKey)
-        sharedDefaults?.synchronize()  // Force immediate save
-        print("💾 SharedStorageManager: Feature flag '\(key)' \(enabled ? "enabled" : "disabled")")
-
-        // Post notification for observers
-        let notificationName = Notification.Name("featureFlagChanged_\(key)")
-        NotificationCenter.default.post(
-            name: notificationName,
-            object: enabled
-        )
-        print("📢 SharedStorageManager: Posted \(notificationName.rawValue) notification")
-    }
-
-    /// Clears specific feature flag (resets to default)
-    /// - Parameter key: Feature flag identifier to clear
-    func clearFeatureFlag(_ key: String) {
-        let storageKey = Keys.featureFlagPrefix + key
-        sharedDefaults?.removeObject(forKey: storageKey)
-        print("🗑️ SharedStorageManager: Cleared feature flag '\(key)'")
-    }
-
-    /// Gets all active feature flags (for debugging)
-    /// - Returns: Dictionary of feature flag keys and their enabled states
-    func getAllFeatureFlags() -> [String: Bool] {
-        var flags: [String: Bool] = [:]
-
-        // Known feature flags
-        let knownFlags = ["analyse_text"]
-
-        for flag in knownFlags {
-            flags[flag] = getFeatureFlagEnabled(flag)
-        }
-
-        return flags
     }
 }

@@ -120,8 +120,6 @@ class TestFallbackResponse:
         assert result["explanation"] == "test reason"
 
 
-# DISABLED: Analyse Text feature shelved - see docs/EPIC_12_DISABLED_TESTS.md for reactivation
-@pytest.mark.skip(reason="Analyse Text feature shelved - Epic 12")
 @pytest.mark.asyncio
 class TestAnalyzeText:
     """Test analyze_text function with various scenarios."""

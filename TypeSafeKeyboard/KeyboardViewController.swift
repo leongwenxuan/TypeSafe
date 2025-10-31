@@ -42,6 +42,7 @@ class KeyboardViewController: UIInputViewController {
     // Snippet management (Story 2.2)
     private let snippetManager = TextSnippetManager()
     private let secureDetector = SecureTextDetector()
+    private let snippetProcessingQueue = DispatchQueue(label: "com.typesafe.keyboard.snippets", qos: .userInteractive)
     
     // Backend API integration (Story 2.3)
     private let apiService = APIService()
@@ -185,7 +186,9 @@ class KeyboardViewController: UIInputViewController {
         updateAppearance()
         
         // Clear snippet buffer on field change (Story 2.2)
-        snippetManager.clear()
+        snippetProcessingQueue.async { [weak self] in
+            self?.snippetManager.clear()
+        }
         print("KeyboardViewController: Snippet buffer cleared due to field change")
         
         // Story 2.8: Invalidate secure field detection cache on field change
@@ -682,25 +685,19 @@ class KeyboardViewController: UIInputViewController {
     }
     
     private func createKeyButton(title: String, action: Selector) -> UIButton {
-        let button = UIButton(type: .custom)  // Story 6.1: Changed from .system to .custom to avoid blue tint color
+        let button = KeyboardKeyButton()
         button.setTitle(title, for: .normal)
         button.titleLabel?.font = UIFont.systemFont(ofSize: 20, weight: .regular)  // Story 6.2: Increased from 18pt to 20pt for better visual balance with larger keys
-        button.layer.cornerRadius = 6  // More rounded corners like Apple keyboard
-        button.layer.borderWidth = 0  // Remove border for cleaner look
         button.addTarget(self, action: action, for: .touchUpInside)
-        
-        // Add shadow for depth (like Apple keyboard)
-        button.layer.shadowColor = UIColor.black.cgColor
-        button.layer.shadowOffset = CGSize(width: 0, height: 1)
-        button.layer.shadowOpacity = 0.15
-        button.layer.shadowRadius = 0
         
         // Story 6.1: Set initial colors (will be updated by updateAppearance)
         // Check both textDocumentProxy and traitCollection for more reliable dark mode detection
         let isDark = textDocumentProxy.keyboardAppearance == .dark || 
                      (textDocumentProxy.keyboardAppearance == .default && traitCollection.userInterfaceStyle == .dark)
-        button.backgroundColor = isDark ? darkKeyBackground : lightKeyBackground
-        button.setTitleColor(isDark ? darkTextColor : lightTextColor, for: .normal)
+        button.applyColors(
+            background: isDark ? darkKeyBackground : lightKeyBackground,
+            textColor: isDark ? darkTextColor : lightTextColor
+        )
         
         return button
     }
@@ -986,8 +983,9 @@ class KeyboardViewController: UIInputViewController {
         let textColor = isDark ? darkTextColor : lightTextColor
         
         for view in stackView.arrangedSubviews {
-            if let button = view as? UIButton {
-                // Apply consistent color scheme to all keys
+            if let keyButton = view as? KeyboardKeyButton {
+                keyButton.applyColors(background: keyColor, textColor: textColor)
+            } else if let button = view as? UIButton {
                 button.backgroundColor = keyColor
                 button.setTitleColor(textColor, for: .normal)
             } else if let nestedStack = view as? UIStackView {
@@ -995,7 +993,9 @@ class KeyboardViewController: UIInputViewController {
             } else {
                 // Handle container views
                 for subview in view.subviews {
-                    if let button = subview as? UIButton {
+                    if let keyButton = subview as? KeyboardKeyButton {
+                        keyButton.applyColors(background: keyColor, textColor: textColor)
+                    } else if let button = subview as? UIButton {
                         button.backgroundColor = keyColor
                         button.setTitleColor(textColor, for: .normal)
                     } else if let nestedStack = subview as? UIStackView {
@@ -1095,9 +1095,11 @@ class KeyboardViewController: UIInputViewController {
         textDocumentProxy.deleteBackward()
         
         // Update snippet buffer (Story 2.2)
-        let wasModified = snippetManager.deleteLastCharacter()
-        if wasModified {
-            print("KeyboardViewController: Snippet buffer updated after backspace")
+        snippetProcessingQueue.async { [weak self] in
+            guard let self = self else { return }
+            if self.snippetManager.deleteLastCharacter() {
+                print("KeyboardViewController: Snippet buffer updated after backspace")
+            }
         }
     }
     
@@ -1148,17 +1150,27 @@ class KeyboardViewController: UIInputViewController {
             return
         }
         
-        // Append character and check for trigger
-        if let snippet = snippetManager.append(character) {
-            // Story 2.3: Send snippet to backend for analysis
-            print("KeyboardViewController: Analysis triggered!")
-            print("  - Reason: \(snippet.triggerReason)")
-            print("  - Content length: \(snippet.content.count) chars")
-            print("  - Preview: \(String(snippet.content.prefix(50)))...")
+        snippetProcessingQueue.async { [weak self] in
+            guard let self = self else { return }
             
-            // Call backend API (non-blocking, async)
-            analyzeSnippet(snippet.content)
+            // Append character and check for trigger
+            if let snippet = self.snippetManager.append(character) {
+                self.handleSnippetTrigger(snippet)
+            }
         }
+    }
+    
+    /// Handles snippet analysis trigger work off the main thread
+    /// - Parameter snippet: Snippet to analyze
+    private func handleSnippetTrigger(_ snippet: TextSnippet) {
+        // Story 2.3: Send snippet to backend for analysis
+        print("KeyboardViewController: Analysis triggered!")
+        print("  - Reason: \(snippet.triggerReason)")
+        print("  - Content length: \(snippet.content.count) chars")
+        print("  - Preview: \(String(snippet.content.prefix(50)))...")
+        
+        // Call backend API (non-blocking, async)
+        analyzeSnippet(snippet.content)
     }
     
     /// Sends text snippet to backend for scam analysis

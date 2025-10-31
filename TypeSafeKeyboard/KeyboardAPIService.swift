@@ -71,12 +71,58 @@ class KeyboardAPIService {
         }
     }
     
+    // MARK: - LinkedIn Models
+    
+    struct LinkedInSearchRequest: Codable {
+        let prompt: String
+        let sessionId: String
+        let maxResults: Int
+        
+        enum CodingKeys: String, CodingKey {
+            case prompt
+            case sessionId = "session_id"
+            case maxResults = "max_results"
+        }
+    }
+    
+    struct LinkedInProfile: Codable {
+        let name: String
+        let title: String
+        let company: String
+        let profileUrl: String
+        let snippet: String
+        
+        enum CodingKeys: String, CodingKey {
+            case name
+            case title
+            case company
+            case profileUrl = "profile_url"
+            case snippet
+        }
+    }
+    
+    struct LinkedInSearchResponse: Codable {
+        let type: String
+        let results: [LinkedInProfile]
+        let searchTimeMs: Int
+        let source: String
+        
+        enum CodingKeys: String, CodingKey {
+            case type
+            case results
+            case searchTimeMs = "search_time_ms"
+            case source
+        }
+    }
+    
     enum APIError: Error, LocalizedError {
         case networkError(Error)
         case invalidResponse
         case serverError(Int)
         case decodingError
         case imageConversionFailed
+        case rateLimitExceeded
+        case validationError
         
         var errorDescription: String? {
             switch self {
@@ -90,6 +136,10 @@ class KeyboardAPIService {
                 return "Failed to decode response"
             case .imageConversionFailed:
                 return "Failed to convert image"
+            case .rateLimitExceeded:
+                return "Rate limit exceeded"
+            case .validationError:
+                return "Validation error"
             }
         }
     }
@@ -292,4 +342,3 @@ class KeyboardAPIService {
         task.resume()
     }
 }
-

@@ -21,6 +21,7 @@ pydantic-settings==2.1.0
 # AI Services
 openai>=1.0.0
 google-generativeai>=0.3.0
+groq>=0.4.0  # Groq AI API client
 
 # Celery & Redis (Task Queue for MCP Agent)
 celery[redis]==5.3.4

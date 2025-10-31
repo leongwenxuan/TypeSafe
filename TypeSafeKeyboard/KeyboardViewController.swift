@@ -138,9 +138,11 @@ class KeyboardViewController: UIInputViewController {
         if heightConstraint == nil {
             print("KeyboardViewController: Creating height constraint")
             // Story 6.2: Increased keyboard height for better usability
-            // New height calculation: 46+46+46+38 + 4*3 spacing + 4+4 padding = 260pt
-            // Add 60pt for banner above keyboard: 260 + 60 = 320pt
-            heightConstraint = view.heightAnchor.constraint(equalToConstant: 320)
+            // New height calculation with reduced banner and increased total height
+            // Banner: 30pt (reduced from 60pt)
+            // Keyboard: increased to take advantage of freed space
+            // Total: 350pt for more spacious keyboard layout
+            heightConstraint = view.heightAnchor.constraint(equalToConstant: 350)
             heightConstraint?.priority = UILayoutPriority(999) // Slightly less than required
             heightConstraint?.isActive = true
         }
@@ -217,7 +219,7 @@ class KeyboardViewController: UIInputViewController {
         NSLayoutConstraint.activate([
             keyboardView.leftAnchor.constraint(equalTo: view.leftAnchor),
             keyboardView.rightAnchor.constraint(equalTo: view.rightAnchor),
-            keyboardView.topAnchor.constraint(equalTo: view.topAnchor, constant: 60), // Leave 60pt for banner
+            keyboardView.topAnchor.constraint(equalTo: view.topAnchor, constant: 30), // Leave 30pt for banner
             keyboardView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
         
@@ -242,17 +244,7 @@ class KeyboardViewController: UIInputViewController {
         toolbar.backgroundColor = .clear
         toolbar.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(toolbar)
-        
-        // Scan Now button (left)
-        let scanButton = UIButton(type: .system)
-        scanButton.setTitle("📸 Scan", for: .normal)
-        scanButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .medium)
-        scanButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.2)
-        scanButton.setTitleColor(.systemBlue, for: .normal)
-        scanButton.layer.cornerRadius = 6
-        scanButton.translatesAutoresizingMaskIntoConstraints = false
-        scanButton.addTarget(self, action: #selector(scanNowTapped), for: .touchUpInside)
-        
+
         // Settings button (right)
         let settingsButton = UIButton(type: .system)
         settingsButton.setTitle("⚙️", for: .normal)
@@ -261,8 +253,7 @@ class KeyboardViewController: UIInputViewController {
         settingsButton.layer.cornerRadius = 6
         settingsButton.translatesAutoresizingMaskIntoConstraints = false
         settingsButton.addTarget(self, action: #selector(settingsTapped), for: .touchUpInside)
-        
-        toolbar.addSubview(scanButton)
+
         toolbar.addSubview(settingsButton)
         
         NSLayoutConstraint.activate([
@@ -271,13 +262,7 @@ class KeyboardViewController: UIInputViewController {
             toolbar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             toolbar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             toolbar.heightAnchor.constraint(equalToConstant: 32),
-            
-            // Scan button on left
-            scanButton.leadingAnchor.constraint(equalTo: toolbar.leadingAnchor, constant: 8),
-            scanButton.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
-            scanButton.widthAnchor.constraint(equalToConstant: 80),
-            scanButton.heightAnchor.constraint(equalToConstant: 28),
-            
+
             // Settings button on right
             settingsButton.trailingAnchor.constraint(equalTo: toolbar.trailingAnchor, constant: -8),
             settingsButton.centerYAnchor.constraint(equalTo: toolbar.centerYAnchor),
@@ -1279,12 +1264,12 @@ class KeyboardViewController: UIInputViewController {
             // Add banner to view hierarchy at top
             self.view.addSubview(banner)
             
-            // Setup Auto Layout constraints (banner positioned in top 60pt area)
+            // Setup Auto Layout constraints (banner positioned in top 40pt area)
             NSLayoutConstraint.activate([
                 banner.topAnchor.constraint(equalTo: self.view.topAnchor),
                 banner.leadingAnchor.constraint(equalTo: self.view.leadingAnchor),
                 banner.trailingAnchor.constraint(equalTo: self.view.trailingAnchor),
-                banner.heightAnchor.constraint(equalToConstant: 60)
+                banner.heightAnchor.constraint(equalToConstant: 40)
             ])
             
             // Store reference
@@ -1553,12 +1538,12 @@ class KeyboardViewController: UIInputViewController {
         // Add banner to view hierarchy at top
         view.addSubview(banner)
         
-        // Setup Auto Layout constraints (banner positioned in top 60pt area)
+        // Setup Auto Layout constraints (banner positioned in top 30pt area)
         NSLayoutConstraint.activate([
             banner.topAnchor.constraint(equalTo: view.topAnchor),
             banner.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             banner.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            banner.heightAnchor.constraint(equalToConstant: 60)
+            banner.heightAnchor.constraint(equalToConstant: 30)
         ])
         
         // Store reference (reusing currentBanner property)
@@ -1643,12 +1628,12 @@ class KeyboardViewController: UIInputViewController {
         // Add banner to view hierarchy at top
         view.addSubview(banner)
         
-        // Setup Auto Layout constraints (banner positioned in top 60pt area)
+        // Setup Auto Layout constraints (banner positioned in top 30pt area)
         NSLayoutConstraint.activate([
             banner.topAnchor.constraint(equalTo: view.topAnchor),
             banner.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             banner.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            banner.heightAnchor.constraint(equalToConstant: 60)
+            banner.heightAnchor.constraint(equalToConstant: 30)
         ])
         
         // Store reference
